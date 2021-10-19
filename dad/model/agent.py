@@ -15,9 +15,9 @@ class AgentRepository:
         plans = {}
         data = {
             "plans": plans,
+            "plans_used": plans_used,
             "intentions": intentions,
             "means": intended_means,
-            "plans_used": plans_used
         }
 
         log_path = self.config.get("current_folder") + "/" + agent_name + ".log"
@@ -26,7 +26,7 @@ class AgentRepository:
             info = json.loads(log_file.readline())
             details = info["details"]
             for label, trigger in details["plans"].items():
-                data["plans"][label] = trigger
+                plans[label] = trigger
 
             for line in log_file.readlines()[1:]:
                 cycle = json.loads(line)
@@ -62,4 +62,7 @@ class AgentRepository:
                         im["res"] = im_data.get("res", "?")
                 if "I-" in cycle:
                     intentions[cycle["I-"]]["end"] = cycle["nr"]
+                if "E+" in cycle and "SI" in cycle:
+                    for event in cycle["E+"]:
+                        event_id = int(event.split(":")[0])
         return data

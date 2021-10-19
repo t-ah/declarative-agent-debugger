@@ -30,7 +30,7 @@ class Application(QApplication):
         self.window.setCentralWidget(PlanSelectionScreen(self))
 
     def show_debugging(self, selected_plan):
-        self.window.setCentralWidget(DebuggingScreen(self))
+        self.window.setCentralWidget(DebuggingScreen(self, selected_plan))
 
 
 class MainWindow(QMainWindow):
