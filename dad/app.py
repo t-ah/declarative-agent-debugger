@@ -2,8 +2,11 @@ import os
 import sys
 import json
 
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMainWindow
 
+from gui.home import HomeScreen
+from gui.plan_selection import PlanSelectionScreen
+from gui.debugging import DebuggingScreen
 from model.agent import AgentRepository
 from gui.window import MainWindow
 
@@ -21,16 +24,22 @@ class Application(QApplication):
         sys.exit(self.exec())
 
     def show_home(self):
-        self.window.show_home()
+        self.window.setCentralWidget(HomeScreen(self.app))
 
     def show_plan_selection(self, folder):
         self.config.set("current_folder", folder)
-        self.window.show_plan_selection()
+        self.window.setCentralWidget(PlanSelectionScreen(self.app))
+
+    def show_debugging(self, selected_plan):
+        self.window.setCentralWidget(DebuggingScreen(self.app))
 
 
-    def show_debugging(self):
-        self.window.show_debugging()
-
+class MainWindow(QMainWindow):
+    def __init__(self, app):
+        super(MainWindow, self).__init__()
+        self.app = app
+        self.setGeometry(200, 200, 1280, 1024)
+        self.setWindowTitle("Declarative Agent Debugger")
 
 
 class Config():

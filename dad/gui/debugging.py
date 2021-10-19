@@ -3,9 +3,10 @@ from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
 
 class DebuggingScreen(QWidget):
-    def __init__(self, app, folder):
+    def __init__(self, app, selected_plan):
         super(DebuggingScreen, self).__init__()
         self.app = app
+        self.agent_repo = self.app.agent_repo
         grid = QGridLayout()
         self.setLayout(grid)
 
