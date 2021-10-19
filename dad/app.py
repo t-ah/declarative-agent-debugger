@@ -23,14 +23,14 @@ class Application(QApplication):
         sys.exit(self.exec())
 
     def show_home(self):
-        self.window.setCentralWidget(HomeScreen(self.app))
+        self.window.setCentralWidget(HomeScreen(self))
 
     def show_plan_selection(self, folder):
         self.config.set("current_folder", folder)
-        self.window.setCentralWidget(PlanSelectionScreen(self.app))
+        self.window.setCentralWidget(PlanSelectionScreen(self))
 
     def show_debugging(self, selected_plan):
-        self.window.setCentralWidget(DebuggingScreen(self.app))
+        self.window.setCentralWidget(DebuggingScreen(self))
 
 
 class MainWindow(QMainWindow):
