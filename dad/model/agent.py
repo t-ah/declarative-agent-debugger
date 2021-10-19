@@ -1,6 +1,5 @@
 import json
 from functools import cache
-from collections import Counter
 
 
 class AgentRepository:
@@ -11,11 +10,9 @@ class AgentRepository:
     def get(self, agent_name):
         intentions = {}
         intended_means = {}
-        plans_used = Counter()
         plans = {}
         data = {
             "plans": plans,
-            "plans_used": plans_used,
             "intentions": intentions,
             "means": intended_means,
         }
@@ -25,8 +22,9 @@ class AgentRepository:
         with open(log_path, "r") as log_file:
             info = json.loads(log_file.readline())
             details = info["details"]
-            for label, trigger in details["plans"].items():
-                plans[label] = trigger
+            for label, plan_data in details["plans"].items():
+                plans[label] = plan_data
+                plan_data["used"] = 0
 
             for line in log_file.readlines()[1:]:
                 cycle = json.loads(line)
@@ -50,7 +48,7 @@ class AgentRepository:
                             "line": im_data["line"],
                             "plan": im_data["plan"]
                         }
-                        plans_used[im["plan"]] += 1
+                        plans[im["plan"]]["used"] += 1
                         intended_means[im_data["id"]] = im
                 if "SI" in cycle:
                     intention = intentions[cycle["SI"]]

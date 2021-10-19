@@ -18,7 +18,7 @@ class Application(QApplication):
         self.window = MainWindow(self)
 
     def start(self):
-        self.window.show_home()
+        self.show_home()
         self.window.show()
         sys.exit(self.exec())
 

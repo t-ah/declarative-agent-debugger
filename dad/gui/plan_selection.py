@@ -60,14 +60,12 @@ class PlanSelectionScreen(QWidget):
 
     def update_plans(self):
         selected_agent = self.agent_table.currentIndex().siblingAtColumn(0).data()
-        # agent_data = self.get_agent_data(selected_agent)
         agent_data = self.app.agent_repo.get(selected_agent)
         self.plan_model.clear()
         self.plan_model.setHorizontalHeaderLabels(self.PLAN_MODEL_LABELS)
-        plan_counts = agent_data["plans_used"]
-        for plan_label, count in plan_counts.items():
-            plan_data = agent_data["plans"][plan_label]
-            self.plan_model.appendRow([QStandardItem(x) for x in [plan_label, plan_data["trigger"], plan_data.get("ctx", "T"), plan_data["body"], str(count)]])
+        for label, plan in agent_data["plans"].items():
+            if plan["used"] == 0: continue
+            self.plan_model.appendRow([QStandardItem(x) for x in [label, plan["trigger"], plan.get("ctx", "T"), plan["body"], str(plan["used"])]])
 
 
 class IntentionSelectionDialog(QDialog):
