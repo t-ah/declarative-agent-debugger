@@ -1,6 +1,8 @@
 import os
+
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QListView
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
+
 from gui.util import get_path_from_user, info
 
 

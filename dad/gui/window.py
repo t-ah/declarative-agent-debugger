@@ -1,7 +1,9 @@
 from PyQt6.QtWidgets import QMainWindow
+
 from gui.home import HomeScreen
 from gui.plan_selection import PlanSelectionScreen
 from gui.debugging import DebuggingScreen
+
 
 class MainWindow(QMainWindow):
     def __init__(self, app):

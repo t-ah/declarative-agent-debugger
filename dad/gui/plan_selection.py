@@ -1,10 +1,11 @@
 import os
 import json
-from collections import Counter
-from PyQt6 import QtWidgets
+
 from PyQt6.QtGui import QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QPushButton, QHBoxLayout, QLabel, QDialog, QTableView, QWidget, QHBoxLayout, QVBoxLayout, QDialogButtonBox
+
 from gui.util import setup_table
+
 
 class PlanSelectionScreen(QWidget):
 
@@ -59,7 +60,8 @@ class PlanSelectionScreen(QWidget):
 
     def update_plans(self):
         selected_agent = self.agent_table.currentIndex().siblingAtColumn(0).data()
-        agent_data = self.get_agent_data(selected_agent)
+        # agent_data = self.get_agent_data(selected_agent)
+        agent_data = self.app.agent_repo.get(selected_agent)
         self.plan_model.clear()
         self.plan_model.setHorizontalHeaderLabels(self.PLAN_MODEL_LABELS)
         plan_counts = agent_data["plans_used"]

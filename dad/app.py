@@ -1,7 +1,10 @@
 import os
 import sys
 import json
+
 from PyQt6.QtWidgets import QApplication
+
+from model.agent import AgentRepository
 from gui.window import MainWindow
 
 
@@ -9,6 +12,7 @@ class Application(QApplication):
     def __init__(self, args):
         super(Application, self).__init__(args)
         self.config = Config()
+        self.agent_repo = AgentRepository(self.config)
         self.window = MainWindow(self)
 
     def start(self):
