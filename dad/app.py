@@ -8,7 +8,6 @@ from gui.home import HomeScreen
 from gui.plan_selection import PlanSelectionScreen
 from gui.debugging import DebuggingScreen
 from model.agent import AgentRepository
-from gui.window import MainWindow
 
 
 class Application(QApplication):
