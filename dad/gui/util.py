@@ -3,15 +3,8 @@ import os
 from PyQt6.QtWidgets import QFileDialog, QMessageBox, QTableView, QAbstractItemView
 
 
-def get_path_from_user(path=""):
-    dlg = QFileDialog()
-    dlg.setFileMode(QFileDialog.FileMode.Directory)
-    if path != "" and os.path.isdir(path):
-        dlg.setDirectory(path)
-
-    if dlg.exec():
-        return dlg.selectedFiles()[0]
-    return ""
+def get_path_from_user(parent=None, path="", caption="Select directory"):
+    return QFileDialog.getExistingDirectory(parent=parent, caption=caption, directory=path)
 
 def info(message):
     msg = QMessageBox()
