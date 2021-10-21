@@ -4,7 +4,7 @@ import json
 from PyQt6.QtGui import QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QPushButton, QHBoxLayout, QLabel, QDialog, QTableView, QWidget, QHBoxLayout, QVBoxLayout, QDialogButtonBox
 
-from gui.util import setup_table
+from gui.util import setup_table, clear_model
 
 
 class PlanSelectionScreen(QWidget):
@@ -12,7 +12,6 @@ class PlanSelectionScreen(QWidget):
     def __init__(self, app):
         super(PlanSelectionScreen, self).__init__()
 
-        self.PLAN_MODEL_LABELS = ["Label", "Trigger", "Context", "Body", "Times used"]
         self.app = app
         self.agent_data = {}
         self.agent_table = QTableView()
@@ -28,7 +27,9 @@ class PlanSelectionScreen(QWidget):
         agent_pane_layout.addWidget(QLabel("Agents"))
 
         agent_model = QStandardItemModel()
-        setup_table(table=self.agent_table, model=agent_model, labels=["Name", "Platform", "Src"], column_widths=[150, 100, 200])
+        setup_table(table=self.agent_table, model=agent_model,
+                    labels=["Name", "Platform", "Src"],
+                    column_widths=[150, 100, 200])
         self.agent_table.clicked.connect(self.update_plans)
         agent_pane_layout.addWidget(self.agent_table)
         
@@ -38,7 +39,9 @@ class PlanSelectionScreen(QWidget):
         plans_pane_layout.addWidget(QLabel("Plans used"))
 
         plans_pane_layout.addWidget(self.plan_table)
-        setup_table(table=self.plan_table, model=self.plan_model, labels=self.PLAN_MODEL_LABELS, column_widths=[300])
+        setup_table(table=self.plan_table, model=self.plan_model,
+                    labels=["Label", "Trigger", "Context", "Body", "Times used"],
+                    column_widths=[300])
         self.plan_table.doubleClicked.connect(self.on_plan_double_clicked)
 
         folder = self.app.config.get("current_folder")
@@ -63,8 +66,7 @@ class PlanSelectionScreen(QWidget):
     def update_plans(self):
         self.selected_agent = self.agent_table.currentIndex().siblingAtColumn(0).data()
         agent_data = self.app.agent_repo.get(self.selected_agent)
-        self.plan_model.clear()
-        self.plan_model.setHorizontalHeaderLabels(self.PLAN_MODEL_LABELS)
+        clear_model(self.plan_model)
         for label, plan in agent_data["plans"].items():
             if plan["used"] == 0: continue
             self.plan_model.appendRow([QStandardItem(x) for x in [label, plan["trigger"], plan.get("ctx", "T"), plan["body"], str(plan["used"])]])
