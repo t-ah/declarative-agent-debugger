@@ -17,4 +17,8 @@ def setup_table(table=None, model=None, labels=[], edit=False, column_widths=[])
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
     for i, width in enumerate(column_widths):
         table.setColumnWidth(i, width)
+    table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
     return table
+
+def clear_model(model):
+    model.removeRows(0, model.rowCount())
