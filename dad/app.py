@@ -25,19 +25,23 @@ class Application(QApplication):
     def show_home(self):
         self.window.setCentralWidget(HomeScreen(self))
 
-    def show_plan_selection(self, folder):
-        self.config.set("current_folder", folder)
+    def show_plan_selection(self, folder=None):
+        if folder == None:
+            folder = self.config.get("current_folder")
+        else:
+            self.config.set("current_folder", folder)
         self.window.setCentralWidget(PlanSelectionScreen(self))
 
-    def show_debugging(self, selected_plan):
-        self.window.setCentralWidget(DebuggingScreen(self, selected_plan))
+    def show_debugging(self, selected_plan, selected_agent):
+        self.window.setCentralWidget(DebuggingScreen(self, selected_plan, selected_agent))
 
 
 class MainWindow(QMainWindow):
     def __init__(self, app):
         super(MainWindow, self).__init__()
         self.app = app
-        self.setGeometry(200, 200, 1280, 1024)
+        self.resize(1280, 1024)
+        self.frameGeometry().moveCenter(self.screen().availableGeometry().center())
         self.setWindowTitle("Declarative Agent Debugger")
 
 

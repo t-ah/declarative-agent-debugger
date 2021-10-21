@@ -11,6 +11,7 @@ class AgentRepository:
         intentions = {}
         intended_means = {}
         plans = {}
+        events = {}
         data = {
             "plans": plans,
             "intentions": intentions,
@@ -26,7 +27,7 @@ class AgentRepository:
                 plans[label] = plan_data
                 plan_data["used"] = 0
 
-            for line in log_file.readlines()[1:]:
+            for line in log_file.readlines():
                 cycle = json.loads(line)
                 if "I+" in cycle:
                     intention = {
@@ -46,13 +47,20 @@ class AgentRepository:
                             "res": "?",
                             "file": im_data["file"],
                             "line": im_data["line"],
-                            "plan": im_data["plan"]
+                            "plan": im_data["plan"],
+                            "children": []
                         }
                         plans[im["plan"]]["used"] += 1
                         intended_means[im_data["id"]] = im
+                        causing_event_id = cycle["SE"]
+                        causing_event = events[causing_event_id]
+                        if causing_event["parent"]:
+                            parent_im_id = causing_event["parent"]
+                            im["parent"] = intended_means[parent_im_id]["children"].append(im_data["id"])
                 if "SI" in cycle:
                     intention = intentions[cycle["SI"]]
-                    intention["instructions"].append(())
+                    if "I" in cycle:
+                        intention["instructions"].append(cycle["I"]["instr"])
                 if "IM-" in cycle:
                     for im_data in cycle["IM-"]:
                         im = intended_means[im_data["id"]]
@@ -60,7 +68,14 @@ class AgentRepository:
                         im["res"] = im_data.get("res", "?")
                 if "I-" in cycle:
                     intentions[cycle["I-"]]["end"] = cycle["nr"]
-                if "E+" in cycle and "SI" in cycle:
-                    for event in cycle["E+"]:
-                        event_id = int(event.split(":")[0])
+                if "E+" in cycle:
+                    for event_data in cycle["E+"]:
+                        event_id, event_content = event_data.split(": ")
+                        event = {
+                            "parent": None,
+                            "name": event_content
+                            }
+                        events[int(event_id)] = event
+                        if "I" in cycle and "im" in cycle["I"]:
+                            event["parent"] = cycle["I"]["im"]
         return data

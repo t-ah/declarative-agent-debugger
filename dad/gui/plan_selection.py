@@ -18,6 +18,7 @@ class PlanSelectionScreen(QWidget):
         self.agent_table = QTableView()
         self.plan_table = QTableView()
         self.plan_model = QStandardItemModel()
+        self.selected_agent = None
 
         main_layout = QHBoxLayout(self)
 
@@ -55,12 +56,13 @@ class PlanSelectionScreen(QWidget):
 
     def on_plan_double_clicked(self):
         selected_plan = self.plan_table.currentIndex().siblingAtColumn(0).data()
+        self.app.show_debugging(selected_plan, self.selected_agent)
         # TODO use dialog later to differentiate options
         # IntentionSelectionDialog(selected_plan).exec()
 
     def update_plans(self):
-        selected_agent = self.agent_table.currentIndex().siblingAtColumn(0).data()
-        agent_data = self.app.agent_repo.get(selected_agent)
+        self.selected_agent = self.agent_table.currentIndex().siblingAtColumn(0).data()
+        agent_data = self.app.agent_repo.get(self.selected_agent)
         self.plan_model.clear()
         self.plan_model.setHorizontalHeaderLabels(self.PLAN_MODEL_LABELS)
         for label, plan in agent_data["plans"].items():

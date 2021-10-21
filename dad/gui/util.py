@@ -5,11 +5,11 @@ from PyQt6.QtWidgets import QFileDialog, QMessageBox, QTableView, QAbstractItemV
 
 def get_path_from_user(path=""):
     dlg = QFileDialog()
-    dlg.setFileMode(QFileDialog.Directory)
+    dlg.setFileMode(QFileDialog.FileMode.Directory)
     if path != "" and os.path.isdir(path):
         dlg.setDirectory(path)
 
-    if dlg.exec_():
+    if dlg.exec():
         return dlg.selectedFiles()[0]
     return ""
 
