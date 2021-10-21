@@ -23,7 +23,6 @@ class HomeScreen(QWidget):
         model = QStandardItemModel()
         self.previous_folder_list.setModel(model)
         for folder in self.app.config.get_previous_folders():
-            # TODO check if folder exists, remove else
             item = QStandardItem(folder)
             model.appendRow(item)
         layout.addWidget(self.previous_folder_list)
@@ -42,5 +41,4 @@ class HomeScreen(QWidget):
         if os.path.isdir(folder):
             self.app.show_plan_selection(folder)
         else:
-            info("Directory does not exist anymore.")
-        # TODO
+            info("Directory does not exist anymore.", parent=self)

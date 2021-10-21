@@ -61,6 +61,8 @@ class Config():
             json.dump(self.data, config_file)
 
     def get_previous_folders(self):
+        self.data["previous_folders"] = list(filter(lambda path: os.path.isdir(path), self.data["previous_folders"]))
+        self.save()
         return self.data["previous_folders"]
 
     def add_previous_folder(self, folder):
