@@ -7,7 +7,7 @@ def get_path_from_user(parent=None, path="", caption="Select directory"):
 def info(message, parent=None):
     QMessageBox.information(parent, "Attention", message)
 
-def setup_table(table=None, model=None, labels=[], edit=False):
+def setup_table(table=None, model=None, labels=[], edit=False, column_widths=[]):
     if table == None:
         table = QTableView()
     if model != None:
@@ -15,4 +15,6 @@ def setup_table(table=None, model=None, labels=[], edit=False):
         table.setModel(model)
     if not edit:
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+    for i, width in enumerate(column_widths):
+        table.setColumnWidth(i, width)
     return table

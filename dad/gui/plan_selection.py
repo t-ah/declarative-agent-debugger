@@ -28,7 +28,7 @@ class PlanSelectionScreen(QWidget):
         agent_pane_layout.addWidget(QLabel("Agents"))
 
         agent_model = QStandardItemModel()
-        setup_table(table=self.agent_table, model=agent_model, labels=["Name", "Platform", "Src"])
+        setup_table(table=self.agent_table, model=agent_model, labels=["Name", "Platform", "Src"], column_widths=[150, 100, 200])
         self.agent_table.clicked.connect(self.update_plans)
         agent_pane_layout.addWidget(self.agent_table)
         
@@ -38,7 +38,7 @@ class PlanSelectionScreen(QWidget):
         plans_pane_layout.addWidget(QLabel("Plans used"))
 
         plans_pane_layout.addWidget(self.plan_table)
-        setup_table(table=self.plan_table, model=self.plan_model, labels=self.PLAN_MODEL_LABELS)
+        setup_table(table=self.plan_table, model=self.plan_model, labels=self.PLAN_MODEL_LABELS, column_widths=[300])
         self.plan_table.doubleClicked.connect(self.on_plan_double_clicked)
 
         folder = self.app.config.get("current_folder")
