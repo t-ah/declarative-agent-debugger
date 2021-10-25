@@ -20,6 +20,8 @@ class DebuggingScreen(QWidget):
         grid.addWidget(back_button, 1, 0)
         back_button.clicked.connect(self.navigate_back)
 
+        # TODO select first item and begin navigation strategy
+
     def navigate_back(self):
         self.app.show_plan_selection()
 
@@ -40,7 +42,7 @@ class DebuggingTreeView(QTreeView):
                 self.add_im_node(root, im)
 
     def add_im_node(self, parent_node, im):
-        item = QStandardItem(self.agent_data["plans"][im["plan"]]["trigger"])
+        item = QStandardItem(self.agent_data["plans"][im["plan"]]["trigger"] +" "+ str(im["intention"]))
         parent_node.appendRow(item)
         for child_im_id in im["children"]:
             child_im = self.agent_data["means"][child_im_id]

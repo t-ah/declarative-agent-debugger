@@ -6,6 +6,22 @@ class AgentRepository:
     def __init__(self, config):
         self.config = config
 
+    def get_agent_state(self, agent_name, cycle):
+        # TODO
+        state = {
+            "beliefs": [],
+            "intentions": []
+        }
+        return state
+
+    def get_agent_state_diff(self, agent_name, start_cycle, end_cycle):
+        start_state = self.get_agent_state(agent_name, start_cycle)
+        # TODO calculate diff
+        diff = {
+
+        }
+        return diff
+
     @cache
     def get(self, agent_name):
         intentions = {}
