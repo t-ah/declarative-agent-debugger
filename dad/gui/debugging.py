@@ -1,5 +1,8 @@
 from PyQt6.QtWidgets import QPushButton, QWidget, QGridLayout, QTreeView, QListView
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtGui import QColor, QStandardItemModel, QStandardItem
+
+from debug.tree import DebuggingTreeNode, JasonDebuggingTreeNode
+from debug.navigation_strategy import SimpleJasonNavigationStrategy
 
 
 class DebuggingScreen(QWidget):
@@ -7,51 +10,58 @@ class DebuggingScreen(QWidget):
         super(DebuggingScreen, self).__init__()
         self.app = app
         self.agent_repo = self.app.agent_repo
+        self.agent_data = self.agent_repo.get_agent_data(selected_agent)
         grid = QGridLayout()
         self.setLayout(grid)
 
-        tree_view = DebuggingTreeView(selected_plan, selected_agent, app.agent_repo)
+        trees = JasonDebuggingTreeNode.create(self.agent_data, selected_plan)
+        strategy = SimpleJasonNavigationStrategy(trees) # TODO allow selection of nav-strategy
+
+        tree_view = DebuggingTreeView(trees)
         grid.addWidget(tree_view, 0, 0)
 
-        node_view = NodeView()
+        node_view = ValidationView()
         grid.addWidget(node_view, 0, 1)
 
         back_button = QPushButton("Back")
         grid.addWidget(back_button, 1, 0)
-        back_button.clicked.connect(self.navigate_back)
+        back_button.clicked.connect(self.back)
 
-        # TODO select first item and begin navigation strategy
+        while strategy.has_next():
+            node = strategy.get_next_node()
+            # TODO
 
-    def navigate_back(self):
+    def back(self):
         self.app.show_plan_selection()
 
 
 class DebuggingTreeView(QTreeView):
-    def __init__(self, selected_plan, selected_agent, agent_repo):
+    def __init__(self, trees: list[DebuggingTreeNode]):
         super(DebuggingTreeView, self).__init__()
-        self.selected_plan = selected_plan
-        self.agent_data = agent_repo.get(selected_agent)
 
         model = QStandardItemModel()
+        model.setHorizontalHeaderLabels(["Debugging Tree"])
         self.setModel(model)
 
-        root = model.invisibleRootItem()
-        for im_id in self.agent_data["means"]:
-            im = self.agent_data["means"][im_id]
-            if im["plan"] == selected_plan:
-                self.add_im_node(root, im)
+        for tree in trees:
+            for node in tree.traverse():
+                node.view = DebuggingTreeView.create_node(node.label)
+                parent_view = node.parent.view if node.parent else model.invisibleRootItem()
+                parent_view.appendRow(node.view)
 
-    def add_im_node(self, parent_node, im):
-        item = QStandardItem(self.agent_data["plans"][im["plan"]]["trigger"] +" "+ str(im["intention"]))
-        parent_node.appendRow(item)
-        for child_im_id in im["children"]:
-            child_im = self.agent_data["means"][child_im_id]
-            self.add_im_node(item, child_im)
+        self.expandRecursively(model.invisibleRootItem().index())
+
+    @staticmethod
+    def create_node(label) -> QStandardItem:
+        item = QStandardItem(label)
+        item.setEditable(False)
+        item.setBackground(QColor(0, 0, 100))
+        return item
 
 
-class NodeView(QListView):
+class ValidationView(QListView):
     def __init__(self):
-        super(NodeView, self).__init__()
+        super(ValidationView, self).__init__()
 
         model = QStandardItemModel()
         self.setModel(model)

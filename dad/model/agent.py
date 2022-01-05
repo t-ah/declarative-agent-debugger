@@ -7,15 +7,19 @@ class AgentRepository:
         self.config = config
 
     def get_agent_state(self, agent_name, cycle):
-        # TODO
+        # TODO recreate agent state at cycle X
+        agent_data = self.get_agent_data(agent_name)
+        print(agent_data)
+
         state = {
             "beliefs": [],
             "intentions": []
         }
         return state
 
-    def get_agent_state_diff(self, agent_name, start_cycle, end_cycle):
-        start_state = self.get_agent_state(agent_name, start_cycle)
+    def get_agent_state_diff(self, agent_name, cycle1, cycle2):
+        state1 = self.get_agent_state(agent_name, cycle1)
+        state2 = self.get_agent_state(agent_name, cycle2)
         # TODO calculate diff
         diff = {
 
@@ -23,7 +27,7 @@ class AgentRepository:
         return diff
 
     @cache
-    def get(self, agent_name):
+    def get_agent_data(self, agent_name):
         intentions = {}
         intended_means = {}
         plans = {}
@@ -32,6 +36,7 @@ class AgentRepository:
             "plans": plans,
             "intentions": intentions,
             "means": intended_means,
+            "events": events
         }
 
         log_path = self.config.get("current_folder") + "/" + agent_name + ".log"

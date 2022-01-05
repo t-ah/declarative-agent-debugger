@@ -30,7 +30,7 @@ class PlanSelectionScreen(QWidget):
         setup_table(table=self.agent_table, model=agent_model,
                     labels=["Name", "Platform", "Src"],
                     column_widths=[150, 100, 200])
-        self.agent_table.clicked.connect(self.update_plans)
+        self.agent_table.clicked.connect(self.update_visible_plans)
         agent_pane_layout.addWidget(self.agent_table)
         
         plans_pane = QWidget()
@@ -60,15 +60,17 @@ class PlanSelectionScreen(QWidget):
     def on_plan_double_clicked(self):
         selected_plan = self.plan_table.currentIndex().siblingAtColumn(0).data()
         self.app.show_debugging(selected_plan, self.selected_agent)
+        # TODO notify app, let app decide what to do
         # TODO use dialog later to differentiate options
         # IntentionSelectionDialog(selected_plan).exec()
 
-    def update_plans(self):
+    def update_visible_plans(self):
         self.selected_agent = self.agent_table.currentIndex().siblingAtColumn(0).data()
-        agent_data = self.app.agent_repo.get(self.selected_agent)
+        agent_data = self.app.agent_repo.get_agent_data(self.selected_agent)
         clear_model(self.plan_model)
         for label, plan in agent_data["plans"].items():
-            if plan["used"] == 0: continue
+            if plan["used"] == 0:
+                continue
             self.plan_model.appendRow([QStandardItem(x) for x in [label, plan["trigger"], plan.get("ctx", "T"), plan["body"], str(plan["used"])]])
 
 
