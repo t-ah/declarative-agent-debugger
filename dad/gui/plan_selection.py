@@ -89,9 +89,9 @@ class IntentionSelectionDialog(QDialog):
         # TODO switch to actual features later
 
         self.setWindowTitle("Intention selection.")
-        self.layout = QVBoxLayout()
+        layout = QVBoxLayout()
         self.layout.addWidget(message)
         self.layout.addWidget(button_intention)
         self.layout.addWidget(button_plan)
         self.layout.addWidget(button_box)
-        self.setLayout(self.layout)
+        self.setLayout(layout)
