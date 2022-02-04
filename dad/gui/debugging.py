@@ -1,7 +1,7 @@
 from select import select
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import *
-from dad.debug.tree import Result
+from debug.tree import Result
 
 from model.agent import AgentRepository
 from debug.tree import DebuggingTreeNode, JasonDebuggingTreeNode
@@ -17,7 +17,7 @@ class DebuggingScreen(QWidget):
         self.agent_data = self.agent_repo.get_agent_data(selected_agent)
         self.grid = QGridLayout()
         self.setLayout(self.grid)
-        self.current_node: JasonDebuggingTreeNode
+        self.node: JasonDebuggingTreeNode
         self.question_view: QWidget
 
         trees = DebuggingScreen.create_trees(self.agent_data, selected_plan)
@@ -42,12 +42,17 @@ class DebuggingScreen(QWidget):
         return result
 
     def bug_located(self):
-        pass # TODO
+        # TODO display bug in some form
+        ...
 
     def debug(self):
         # TODO highlight current node
-        self.node = self.strategy.get_next() # TODO continue debugging until done
-        self.validate_goal_addition()
+        next_node = self.strategy.get_next()
+        if next_node:
+            self.validate_goal_addition()
+        else:
+            # TODO set bug info somehow
+            self.bug_located()
 
     def validate_goal_addition(self):
         im = self.node.im

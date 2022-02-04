@@ -1,3 +1,5 @@
+from typing import Optional
+
 from model.agent import AgentRepository
 from debug.tree import DebuggingTreeNode, JasonDebuggingTreeNode, Result
 
@@ -27,26 +29,30 @@ class SimpleJasonNavigationStrategy:
             for node in tree.traverse():
                 node.state = Result.Undecided
         self.agent_name = agent_name
-        self.prev_node = None
+        self.prev_node: JasonDebuggingTreeNode
+        self.final_bug: JasonDebuggingTreeNode
 
     def mark_node(self, node: JasonDebuggingTreeNode, result: Result):
         node.state = result
 
-    def get_next(self) -> JasonDebuggingTreeNode:
-        root = self.trees[0] # FIXME consider all trees later
-        # diff = self.agent_repo.get_agent_state_diff(self.agent_name, root.im["start"], root.im["end"])
-        # diff_groups = []
-        # for key in ("B+", "B-"):
-        #     diff_groups.append({
-        #         "title" : key,
-        #         "items" : diff[key]
-        #     })
-        # for key in ("G+", "G-"):
-        #     ims = [str(im) for im in diff[key]]
-        #     diff_groups.append({
-        #         "title" : key,
-        #         "items" : ims
-        #     })
-        self.prev_node = root
-        # TODO handle navigation according to result of previous validation
-        return root
+    def get_next(self):
+        if not self.prev_node:
+            root = self.trees[0] # FIXME consider all trees later
+            self.prev_node = root
+            return root
+
+        node = self.prev_node
+        if node.state == Result.Invalid:
+            if node.children:
+                return node.children[0]
+            else:
+                self.final_bug = node
+                return None
+        elif node.state == Result.Valid:
+            if node.next_sibling:
+                return node.next_sibling
+            else:
+                if node.parent and node.parent.state == Result.Invalid:
+                    self.final_bug = node.parent
+                return None
+        return None

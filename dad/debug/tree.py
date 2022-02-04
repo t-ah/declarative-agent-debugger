@@ -13,9 +13,12 @@ class DebuggingTreeNode:
         self.label = label
         self.children = []
         self.parent = parent
+        self.next_sibling: DebuggingTreeNode
         self.state = Result.Undecided
 
-    def append_child(self, node):
+    def append_child(self, node: "DebuggingTreeNode"):
+        if self.children:
+            self.children[-1].sibling = node
         self.children.append(node)
         node.parent = self
 
@@ -27,7 +30,7 @@ class DebuggingTreeNode:
 
 class JasonDebuggingTreeNode(DebuggingTreeNode):
     def __init__(self, agent_data, im):
-        super().__init__(agent_data["plans"][im["plan"]]["trigger"] +" id="+ str(im["intention"]))
+        super().__init__(f'{im["event"]["name"]} intention={im["intention"]}')
         self.im = im
         for child_im_id in im["children"]:
             child_im = agent_data["means"][child_im_id]
