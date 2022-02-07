@@ -1,24 +1,39 @@
+from enum import Enum
 from typing import Optional
 
 from model.agent import AgentRepository
-from debug.tree import DebuggingTreeNode, JasonDebuggingTreeNode, Result
 
 
+class Result(Enum):
+    Undecided = 0
+    Valid = 1
+    Invalid = 2
+    Skipped = 3
 
-class AbstractNavigationStrategy:
-    def __init__(self, trees: list[DebuggingTreeNode], agent_repo: AgentRepository):
-        ...
 
-    def get_next(self) -> DebuggingTreeNode:
-        """Get the next node to be validated."""
-        ...
+class JasonDebuggingTreeNode:
+    def __init__(self, agent_data, im, parent=None):
+        self.label = f'{im["event"]["name"]} intention={im["intention"]}'
+        self.children = []
+        self.parent = parent
+        self.next_sibling: Optional[JasonDebuggingTreeNode] = None
+        self.state = Result.Undecided
+        self.im = im
+        for child_im_id in im["children"]:
+            child_im = agent_data["means"][child_im_id]
+            node = JasonDebuggingTreeNode(agent_data, child_im)
+            self.append_child(node)
 
-    def mark_node(self, node: DebuggingTreeNode, result: Result):
-        """Mark any node as in/valid or skipped."""
-        ...
+    def append_child(self, node: "JasonDebuggingTreeNode"):
+        if self.children:
+            self.children[-1].sibling = node
+        self.children.append(node)
+        node.parent = self
 
-    def get_result(self) -> object:
-        ...
+    def traverse(self):
+        yield self
+        for child in self.children:
+            yield from child.traverse()
 
 
 class SimpleJasonNavigationStrategy:
@@ -29,8 +44,8 @@ class SimpleJasonNavigationStrategy:
             for node in tree.traverse():
                 node.state = Result.Undecided
         self.agent_name = agent_name
-        self.prev_node: JasonDebuggingTreeNode
-        self.final_bug: JasonDebuggingTreeNode
+        self.prev_node: Optional[JasonDebuggingTreeNode] = None
+        self.final_bug: Optional[JasonDebuggingTreeNode] = None
 
     def mark_node(self, node: JasonDebuggingTreeNode, result: Result):
         node.state = result
@@ -44,13 +59,15 @@ class SimpleJasonNavigationStrategy:
         node = self.prev_node
         if node.state == Result.Invalid:
             if node.children:
-                return node.children[0]
+                self.prev_node = node.children[0]
+                return self.prev_node
             else:
                 self.final_bug = node
                 return None
         elif node.state == Result.Valid:
             if node.next_sibling:
-                return node.next_sibling
+                self.prev_node = node.next_sibling
+                return self.prev_node
             else:
                 if node.parent and node.parent.state == Result.Invalid:
                     self.final_bug = node.parent

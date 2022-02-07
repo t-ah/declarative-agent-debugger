@@ -1,11 +1,9 @@
-from select import select
+from typing import Optional
 from PyQt6.QtWidgets import *
-from PyQt6.QtGui import *
-from debug.tree import Result
+from PyQt6.QtGui import QColor
 
 from model.agent import AgentRepository
-from debug.tree import DebuggingTreeNode, JasonDebuggingTreeNode
-from debug.navigation_strategy import SimpleJasonNavigationStrategy
+from debug.navigation_strategy import JasonDebuggingTreeNode, SimpleJasonNavigationStrategy, Result
 
 
 class DebuggingScreen(QWidget):
@@ -18,13 +16,14 @@ class DebuggingScreen(QWidget):
         self.grid = QGridLayout()
         self.setLayout(self.grid)
         self.node: JasonDebuggingTreeNode
-        self.question_view: QWidget
+        self.question_view: Optional[QWidget] = None
+        self.bug: Bug
 
         trees = DebuggingScreen.create_trees(self.agent_data, selected_plan)
-        self.strategy = SimpleJasonNavigationStrategy(trees, self.agent_repo, selected_agent) # TODO allow selection of nav-strategy
+        self.strategy = SimpleJasonNavigationStrategy(trees, self.agent_repo, selected_agent)
 
-        tree_view = DebuggingTreeView(trees)
-        self.grid.addWidget(tree_view, 0, 0)
+        self.tree_view = DebuggingTreeView(trees)
+        self.grid.addWidget(self.tree_view, 0, 0)
 
         back_button = QPushButton("Back")
         self.grid.addWidget(back_button, 1, 0)
@@ -42,27 +41,41 @@ class DebuggingScreen(QWidget):
         return result
 
     def bug_located(self):
-        # TODO display bug in some form
-        ...
+        result_view = ResultView()
+        self.set_question_view(result_view)
+        if self.bug:
+            result_view.add_message(f"Bug located in {self.bug.file} line {self.bug.location}. Reason: {self.bug.reason}")
 
     def debug(self):
-        # TODO highlight current node
         next_node = self.strategy.get_next()
         if next_node:
-            self.validate_goal_addition()
+            self.node = next_node
+            self.tree_view.highlight_node(next_node)
+            self.validate_goal_addition(next_node)
         else:
-            # TODO set bug info somehow
+            buggy_node = self.strategy.final_bug
+            if buggy_node:
+                im = buggy_node.im
+                self.bug = Bug(im["event"]["name"], im["file"], im["line"])
+            else:
+                self.bug = Bug("No bug found", "-", "0")
             self.bug_located()
 
-    def validate_goal_addition(self):
-        im = self.node.im
+    def validate_goal_addition(self, node: JasonDebuggingTreeNode):
+        im = node.im
         validation_widget = QWidget()
-        self.question_view = validation_widget
+        self.set_question_view(validation_widget)
         validation_widget.setLayout(QVBoxLayout())
 
         event = im["event"]["name"]
         instruction = im["event"]["instruction"]
-        question = "Are goal instantiation and context correct?" if event[0] == "+" else "Is it 'acceptable' that the plan failed at this point?"
+        if event[0] == "+":
+            question = "Are goal instantiation and context correct?"
+            self.bug = Bug(f"Bug in adding goal {event}.", "", "")
+        else:
+            question = "Is it 'acceptable' that the plan failed at this point?"
+            self.bug = Bug(f"Plan for {event} should not have failed.", "", "") # TODO show instruction causing the failure
+
         validation_widget.layout().addWidget(QLabel(question))
         validation_widget.layout().addWidget(QLabel(f"Goal (Event): {event}"))
         validation_widget.layout().addWidget(QLabel(f"Previous instruction: {instruction}"))
@@ -73,7 +86,7 @@ class DebuggingScreen(QWidget):
         btn_bar = QWidget()
         btn_bar.setLayout(QHBoxLayout())
         btn_yes = QPushButton("Yes")
-        btn_yes.clicked.connect(self.goal_addition_validated)
+        btn_yes.clicked.connect(lambda: self.goal_addition_validated(node))
         btn_no = QPushButton("No")
         btn_no.clicked.connect(self.bug_located)
         for widget in [btn_yes, btn_no]:
@@ -82,11 +95,11 @@ class DebuggingScreen(QWidget):
 
         self.set_question_view(validation_widget)
 
-    def goal_addition_validated(self):
-        self.validate_goal_result()
+    def goal_addition_validated(self, node: JasonDebuggingTreeNode):
+        self.validate_goal_result(node)
 
-    def validate_goal_result(self):
-        im = self.node.im
+    def validate_goal_result(self, node: JasonDebuggingTreeNode):
+        im = node.im
         validation_widget = QWidget()
         validation_widget.setLayout(QVBoxLayout())
 
@@ -110,10 +123,12 @@ class DebuggingScreen(QWidget):
 
     def goal_result_validated(self):
         self.strategy.mark_node(self.node, Result.Valid)
+        self.tree_view.mark_validity(self.node, True)
         self.debug()
 
     def goal_result_invalidated(self):
         self.strategy.mark_node(self.node, Result.Invalid)
+        self.tree_view.mark_validity(self.node, False)
         self.debug()
 
     def set_question_view(self, view: QWidget):
@@ -130,6 +145,11 @@ class DebuggingTreeView(QTreeWidget):
     def __init__(self, trees: list[JasonDebuggingTreeNode]):
         super(DebuggingTreeView, self).__init__()
         self.views = {}
+        self.highlighted_node: Optional[JasonDebuggingTreeNode] = None
+        self.color_std = QColor(0, 0, 0)
+        self.color_highlight = QColor(0, 100, 100)
+        self.color_valid = QColor(0, 150, 0)
+        self.color_invalid = QColor(150, 0, 0)
 
         for tree in trees:
             for node in tree.traverse():
@@ -137,7 +157,6 @@ class DebuggingTreeView(QTreeWidget):
                 self.views[node] = node_view
                 parent_view = self.views[node.parent] if node.parent else self.invisibleRootItem()
                 parent_view.addChild(node_view)
-
         self.expandAll()
 
     @staticmethod
@@ -147,6 +166,20 @@ class DebuggingTreeView(QTreeWidget):
         if color:
             item.setBackground(0, QColor(*color))
         return item
+
+    def color_node(self, node: JasonDebuggingTreeNode, color: QColor):
+        view = self.views[node]
+        if view:
+            view.setBackground(0, color)
+
+    def highlight_node(self, node: JasonDebuggingTreeNode):
+        if self.highlighted_node:
+            self.color_node(node, self.color_std)
+        self.highlighted_node = node
+        self.color_node(node, self.color_highlight)
+
+    def mark_validity(self, node: JasonDebuggingTreeNode, valid: bool):
+        self.color_node(node, self.color_valid if valid else self.color_invalid)
 
 
 class AgentStateView(QWidget):
@@ -200,8 +233,7 @@ class AgentStateView(QWidget):
 class TreeView(QWidget):
     def __init__(self, title):
         super(TreeView, self).__init__()
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+        self.setLayout(QVBoxLayout())
         self.tree = QTreeWidget()
         self.layout().addWidget(QLabel(title))
         self.layout().addWidget(self.tree)
@@ -250,51 +282,67 @@ class IntentionView(TreeView):
             self.add_im_recursive(child_im, node)
 
 
-class ValidationView(QWidget):
-    def __init__(self, controller: DebuggingScreen):
-        super(ValidationView, self).__init__()
-        self.controller = controller
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+class ResultView(QWidget):
+    def __init__(self):
+        super(ResultView, self).__init__()
+        self.setLayout(QVBoxLayout())
 
-        self.item_list = QTreeWidget()
-        layout.addWidget(self.item_list)
-
-        button_bar = QWidget()
-        button_bar_layout = QHBoxLayout()
-        button_bar.setLayout(button_bar_layout)
-        layout.addWidget(button_bar)
-        btn_valid = QPushButton("Valid")
-        btn_invalid = QPushButton("Invalid")
-        btn_maybe = QPushButton("Unsure")
-        button_bar_layout.addWidget(btn_valid)
-        button_bar_layout.addWidget(btn_invalid)
-        button_bar_layout.addWidget(btn_maybe)
-
-    def present_node(self, node : DebuggingTreeNode, item_groups: list[dict]) -> None:
-        self.node = node
-        self.item_list.clear()
-        root = self.item_list.invisibleRootItem()
-        for item_group in item_groups:
-            group_node = DebuggingTreeView.create_node(item_group["title"], color=(0, 10, 150))
-            root.addChild(group_node)
-            for item in item_group["items"]:
-                custom_item = ValidationItem(item)
-                list_item = QTreeWidgetItem(self.item_list)
-                list_item.setSizeHint(0, custom_item.sizeHint())
-                group_node.addChild(list_item)
-                self.item_list.setItemWidget(list_item, 0, custom_item)
+    def add_message(self, msg):
+        self.layout().addWidget(QLabel(msg))
 
 
-class ValidationItem(QWidget):
-    def __init__(self, text: str):
-        super(ValidationItem, self).__init__()
+class Bug:
+    def __init__(self, reason: str, file: str, location: str):
+        self.reason = reason
+        self.file = file
+        self.location = location
 
-        self.checkbox = QCheckBox()
-        label = QLabel(text)
-        label.setWordWrap(True)
 
-        layout = QHBoxLayout()
-        self.setLayout(layout)
-        layout.addWidget(self.checkbox)
-        layout.addWidget(label, 1)
+# class ValidationView(QWidget):
+#     def __init__(self, controller: DebuggingScreen):
+#         super(ValidationView, self).__init__()
+#         self.controller = controller
+#         layout = QVBoxLayout()
+#         self.setLayout(layout)
+
+#         self.item_list = QTreeWidget()
+#         layout.addWidget(self.item_list)
+
+#         button_bar = QWidget()
+#         button_bar_layout = QHBoxLayout()
+#         button_bar.setLayout(button_bar_layout)
+#         layout.addWidget(button_bar)
+#         btn_valid = QPushButton("Valid")
+#         btn_invalid = QPushButton("Invalid")
+#         btn_maybe = QPushButton("Unsure")
+#         button_bar_layout.addWidget(btn_valid)
+#         button_bar_layout.addWidget(btn_invalid)
+#         button_bar_layout.addWidget(btn_maybe)
+
+#     def present_node(self, node : JasonDebuggingTreeNode, item_groups: list[dict]) -> None:
+#         self.node = node
+#         self.item_list.clear()
+#         root = self.item_list.invisibleRootItem()
+#         for item_group in item_groups:
+#             group_node = DebuggingTreeView.create_node(item_group["title"], color=(0, 10, 150))
+#             root.addChild(group_node)
+#             for item in item_group["items"]:
+#                 custom_item = ValidationItem(item)
+#                 list_item = QTreeWidgetItem(self.item_list)
+#                 list_item.setSizeHint(0, custom_item.sizeHint())
+#                 group_node.addChild(list_item)
+#                 self.item_list.setItemWidget(list_item, 0, custom_item)
+
+
+# class ValidationItem(QWidget):
+#     def __init__(self, text: str):
+#         super(ValidationItem, self).__init__()
+
+#         self.checkbox = QCheckBox()
+#         label = QLabel(text)
+#         label.setWordWrap(True)
+
+#         layout = QHBoxLayout()
+#         self.setLayout(layout)
+#         layout.addWidget(self.checkbox)
+#         layout.addWidget(label, 1)
