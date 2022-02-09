@@ -84,9 +84,6 @@ class DebuggingScreen(QWidget):
         validation_widget.layout().addWidget(QLabel(f"Goal (Event): {event_name}"))
         validation_widget.layout().addWidget(QLabel(f"Previous instruction: {instruction}"))
 
-        state_view = AgentStateView(self.agent_repo, self.selected_agent, im.event.cycle if im.event else -1)
-        validation_widget.layout().addWidget(state_view)
-
         btn_bar = QWidget()
         btn_bar.setLayout(QHBoxLayout())
         btn_yes = QPushButton("Yes")
@@ -96,6 +93,9 @@ class DebuggingScreen(QWidget):
         for widget in [btn_yes, btn_no]:
             btn_bar.layout().addWidget(widget)
         validation_widget.layout().addWidget(btn_bar)
+
+        state_view = AgentStateView(self.agent_repo, self.selected_agent, im.event.cycle if im.event else -1)
+        validation_widget.layout().addWidget(state_view)
 
         self.set_question_view(validation_widget)
 
@@ -110,9 +110,6 @@ class DebuggingScreen(QWidget):
         validation_widget.layout().addWidget(QLabel("Has the goal been achieved?"))
         validation_widget.layout().addWidget(QLabel(f"Goal (Event): {im.get_event_name()}"))
 
-        state_view = AgentStateView(self.agent_repo, self.selected_agent, im.end)
-        validation_widget.layout().addWidget(state_view)
-
         btn_bar = QWidget()
         btn_bar.setLayout(QHBoxLayout())
         btn_yes = QPushButton("Yes")
@@ -122,6 +119,9 @@ class DebuggingScreen(QWidget):
         for widget in [btn_yes, btn_no]:
             btn_bar.layout().addWidget(widget)
         validation_widget.layout().addWidget(btn_bar)
+
+        state_view = AgentStateView(self.agent_repo, self.selected_agent, im.end)
+        validation_widget.layout().addWidget(state_view)
 
         self.set_question_view(validation_widget)
 
@@ -198,6 +198,13 @@ class AgentStateView(QWidget):
         self.start_cycle = start_cycle
         self.current_cycle = start_cycle
 
+        self.setLayout(QVBoxLayout())
+
+        self.belief_view = BeliefView()
+        self.layout().addWidget(self.belief_view)
+        self.intention_view = IntentionView(self.agent_data)
+        self.layout().addWidget(self.intention_view)
+
         btn_prev = QPushButton("Prev")
         btn_next = QPushButton("Next")
         self.cycle_label = QLabel(str(start_cycle)) # TODO jump to cycle
@@ -207,19 +214,11 @@ class AgentStateView(QWidget):
         cycle_bar_layout.addWidget(btn_prev)
         cycle_bar_layout.addWidget(self.cycle_label)
         cycle_bar_layout.addWidget(btn_next)
-
-        self.setLayout(QVBoxLayout())
-        self.layout().addWidget(cycle_bar) # TODO reset button for jumping back to original cycle
-
-        self.belief_view = BeliefView()
-        self.layout().addWidget(self.belief_view)
-        self.intention_view = IntentionView(self.agent_data)
-        self.layout().addWidget(self.intention_view)
-
-        self.show_cycle(self.start_cycle)
-
         btn_prev.clicked.connect(self.prev_cycle)
         btn_next.clicked.connect(self.next_cycle)
+        self.layout().addWidget(cycle_bar) # TODO reset button for jumping back to original cycle
+
+        self.show_cycle(self.start_cycle)
 
     def show_cycle(self, cycle):
         self.current_cycle = cycle
