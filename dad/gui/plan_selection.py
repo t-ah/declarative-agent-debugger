@@ -4,16 +4,19 @@ import json
 from PyQt6.QtGui import QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QPushButton, QHBoxLayout, QLabel, QDialog, QTableView, QWidget, QHBoxLayout, QVBoxLayout, QDialogButtonBox
 
+from config import Config
+from model.agent import AgentRepository
 from gui.util import setup_table, clear_model
 
 
 class PlanSelectionScreen(QWidget):
 
-    def __init__(self, app):
+    def __init__(self, config: Config, agent_repo: AgentRepository, callback_plan_selected):
         super(PlanSelectionScreen, self).__init__()
 
-        self.app = app
-        self.agent_data = {}
+        self.config = config
+        self.agent_repo = agent_repo
+        self.callback_plan_selected = callback_plan_selected
         self.agent_table = QTableView()
         self.plan_table = QTableView()
         self.plan_model = QStandardItemModel()
@@ -44,7 +47,7 @@ class PlanSelectionScreen(QWidget):
                     column_widths=[300])
         self.plan_table.doubleClicked.connect(self.on_plan_double_clicked)
 
-        folder = self.app.config.get("current_folder")
+        folder = self.config.get("current_folder")
         agent_infos = []
         for filename in os.listdir(folder):
             if filename.endswith(".log"):
@@ -59,19 +62,18 @@ class PlanSelectionScreen(QWidget):
 
     def on_plan_double_clicked(self):
         selected_plan = self.plan_table.currentIndex().siblingAtColumn(0).data()
-        self.app.show_debugging(selected_plan, self.selected_agent)
-        # TODO notify app, let app decide what to do
+        self.callback_plan_selected(selected_plan, self.selected_agent)
         # TODO use dialog later to differentiate options
         # IntentionSelectionDialog(selected_plan).exec()
 
     def update_visible_plans(self):
         self.selected_agent = self.agent_table.currentIndex().siblingAtColumn(0).data()
-        agent_data = self.app.agent_repo.get_agent_data(self.selected_agent)
+        agent_data = self.agent_repo.get_agent_data(self.selected_agent)
         clear_model(self.plan_model)
-        for label, plan in agent_data["plans"].items():
-            if plan["used"] == 0:
+        for label, plan in agent_data.plans.items():
+            if plan.used == 0:
                 continue
-            self.plan_model.appendRow([QStandardItem(x) for x in [label, plan["trigger"], plan.get("ctx", "T"), plan["body"], str(plan["used"])]])
+            self.plan_model.appendRow([QStandardItem(x) for x in [label, plan.trigger, plan.context, plan.body, str(plan.used)]])
 
 
 class IntentionSelectionDialog(QDialog):

@@ -2,6 +2,17 @@ import sys
 import json
 from functools import cache
 
+from model.bdi import BeliefChange, Plan, Intention, BDIEvent, IntendedMeans
+
+
+class AgentData:
+    def __init__(self):
+        self.intentions: dict[int, Intention] = {}
+        self.intended_means: dict[int, IntendedMeans] = {}
+        self.plans: dict[str, Plan] = {}
+        self.events: dict[int, BDIEvent] = {}
+        self.beliefs: list[BeliefChange] = []
+
 
 class AgentRepository:
     def __init__(self, config):
@@ -12,22 +23,22 @@ class AgentRepository:
         agent_data = self.get_agent_data(agent_name)
 
         beliefs = set()
-        for current_cycle, type, belief in agent_data["beliefs"]:
-            if current_cycle > cycle:
+        for belief_change in agent_data.beliefs:
+            if belief_change.cycle > cycle:
                 break
-            if type == "+":
-                beliefs.add(belief)
+            if belief_change.added:
+                beliefs.add(belief_change.belief)
             else:
-                beliefs.remove(belief)
+                beliefs.remove(belief_change.belief)
 
         imeans_active = []
-        for im_id, im in agent_data["means"].items():
-            if im["start"] <= cycle and im["end"] >= cycle:
+        for im_id, im in agent_data.intended_means.items():
+            if im.start <= cycle and im.end >= cycle:
                 imeans_active.append(im_id)
 
         intentions_active = []
-        for intention in agent_data["intentions"].values():
-            if intention["start"] <= cycle and intention["end"] >= cycle:
+        for intention in agent_data.intentions.values():
+            if intention.start <= cycle and intention.end >= cycle:
                 intentions_active.append(intention)
 
         state = {
@@ -46,10 +57,10 @@ class AgentRepository:
 
         goals_started = []
         goals_finished = []
-        for im_id, im in agent_data["means"].items():
-            if im["start"] >= cycle1:
+        for im_id, im in agent_data.intended_means.items():
+            if im.start >= cycle1:
                 goals_started.append(im)
-            if im["end"] <= cycle2:
+            if im.end <= cycle2:
                 goals_finished.append(im)
 
         diff = {
@@ -61,94 +72,61 @@ class AgentRepository:
         return diff
 
     @cache
-    def get_agent_data(self, agent_name: str) -> dict:
-        intentions = {}
-        intended_means = {}
-        plans = {}
-        events = {}
-        beliefs = []
-        data = {
-            "plans": plans,
-            "intentions": intentions,
-            "means": intended_means,
-            "events": events,
-            "beliefs": beliefs
-        }
-
+    def get_agent_data(self, agent_name: str) -> AgentData:
+        data = AgentData()
         log_path = self.config.get("current_folder") + "/" + agent_name + ".log"
 
         with open(log_path, "r") as log_file:
             info = json.loads(log_file.readline())
             details = info["details"]
-            for label, plan_data in details["plans"].items():
-                plans[label] = plan_data
-                plan_data["used"] = 0
+            for label, pd in details["plans"].items():
+                data.plans[label] = Plan(label, pd["trigger"], pd.get("ctx", "T"), pd["body"], pd["file"], pd["line"])
 
             for line in log_file.readlines():
                 cycle = json.loads(line)
                 if "I+" in cycle:
-                    intention = {
-                        "start": cycle["nr"],
-                        "end": sys.maxsize,
-                        "means": [],
-                        "instructions": []
-                    }
-                    intentions[cycle["I+"]] = intention
+                    intention = Intention(cycle["I+"], cycle["nr"], sys.maxsize, [], [])
+                    data.intentions[cycle["I+"]] = intention
                 if "IM+" in cycle:
                     for im_data in cycle["IM+"]:
-                        intention = intentions[im_data["i"]]
-                        intention["means"].append(im_data["id"])
-                        im = {
-                            "intention": im_data["i"],
-                            "start": cycle["nr"],
-                            "end": sys.maxsize,
-                            "res": "?",
-                            "file": im_data["file"],
-                            "line": im_data["line"],
-                            "plan": im_data["plan"],
-                            "children": [],
-                            "event": None
-                        }
-                        plans[im["plan"]]["used"] += 1
-                        intended_means[im_data["id"]] = im
+                        intention = data.intentions[im_data["i"]]
+                        im = IntendedMeans(im_data["id"], intention, cycle["nr"], sys.maxsize, "?", im_data["file"], im_data["line"], data.plans[im_data["plan"]], [], None, None)
+                        intention.means.append(im)
+                        im.plan.used += 1
+                        data.intended_means[im_data["id"]] = im
                         causing_event_id = cycle["SE"]
-                        causing_event = events[causing_event_id]
-                        im["event"] = causing_event
-                        if causing_event["parent"]:
-                            parent_im_id = causing_event["parent"]
-                            im["parent"] = intended_means[parent_im_id]
-                            intended_means[parent_im_id]["children"].append(im_data["id"])
+                        causing_event = data.events[causing_event_id]
+                        im.event = causing_event
+                        if causing_event.parent:
+                            parent_im = causing_event.parent
+                            im.parent = parent_im
+                            parent_im.children.append(im)
                 if "SI" in cycle:
-                    intention = intentions[cycle["SI"]]
+                    intention = data.intentions[cycle["SI"]]
                     if "I" in cycle:
-                        intention["instructions"].append(cycle["I"]["instr"])
+                        intention.instructions.append(cycle["I"]["instr"])
                 if "IM-" in cycle:
                     for im_data in cycle["IM-"]:
-                        im = intended_means[im_data["id"]]
-                        im["end"] = cycle["nr"]
-                        im["res"] = im_data.get("res", "?")
+                        im = data.intended_means[im_data["id"]]
+                        im.end = cycle["nr"]
+                        im.res = im_data.get("res", "?")
                 if "I-" in cycle:
-                    intentions[cycle["I-"]]["end"] = cycle["nr"]
+                    data.intentions[cycle["I-"]].end = cycle["nr"]
                 if "E+" in cycle:
                     for event_data in cycle["E+"]:
                         event_id, event_content = event_data.split(": ")
                         instr = cycle["I"]["instr"] if "I" in cycle else ""
-                        event = {
-                            "parent": None,
-                            "name": event_content,
-                            "cycle": cycle["nr"],
-                            "instruction": instr
-                        }
-                        events[int(event_id)] = event
+                        event = BDIEvent(None, cycle["nr"], event_content, instr, -1)
+                        data.events[int(event_id)] = event
                         if "I" in cycle and "im" in cycle["I"]:
-                            event["parent"] = cycle["I"]["im"]
+                            event.parent = data.intended_means[cycle["I"]["im"]]
                 if "SE" in cycle:
                     selected_event_id = cycle["SE"]
-                    events[selected_event_id]["sel"] = cycle["nr"]
+                    data.events[selected_event_id].selected = cycle["nr"]
                 if "B+" in cycle:
                     for belief in cycle["B+"]:
-                        beliefs.append((cycle["nr"], "+", belief))
+                        data.beliefs.append(BeliefChange(cycle["nr"], True, belief))
                 if "B-" in cycle:
                     for belief in cycle["B-"]:
-                        beliefs.append((cycle["nr"], "-", belief))
+                        data.beliefs.append(BeliefChange(cycle["nr"], False, belief))
         return data

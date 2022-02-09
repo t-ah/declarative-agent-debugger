@@ -1,8 +1,11 @@
 from typing import Optional
-from PyQt6.QtWidgets import *
-from PyQt6.QtGui import QColor
 
-from model.agent import AgentRepository
+from PyQt6.QtWidgets import QWidget, QGridLayout, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidgetItem, QTreeWidget, QAbstractItemView
+from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt
+
+from model.bdi import Intention
+from model.agent import AgentData, AgentRepository
 from debug.navigation_strategy import JasonDebuggingTreeNode, SimpleJasonNavigationStrategy, Result
 
 
@@ -20,6 +23,8 @@ class DebuggingScreen(QWidget):
         self.bug: Bug
 
         trees = DebuggingScreen.create_trees(self.agent_data, selected_plan)
+        if not trees:
+            return # TODO show message
         self.strategy = SimpleJasonNavigationStrategy(trees, self.agent_repo, selected_agent)
 
         self.tree_view = DebuggingTreeView(trees)
@@ -32,11 +37,10 @@ class DebuggingScreen(QWidget):
         self.debug()
 
     @staticmethod
-    def create_trees(agent_data, selected_plan) -> list[JasonDebuggingTreeNode]:
+    def create_trees(agent_data: AgentData, selected_plan: str) -> list[JasonDebuggingTreeNode]:
         result = []
-        for im_id in agent_data["means"]:
-            im = agent_data["means"][im_id]
-            if im["plan"] == selected_plan:
+        for im in agent_data.intended_means.values():
+            if im.plan.label == selected_plan:
                 result.append(JasonDebuggingTreeNode(agent_data, im))
         return result
 
@@ -56,7 +60,7 @@ class DebuggingScreen(QWidget):
             buggy_node = self.strategy.final_bug
             if buggy_node:
                 im = buggy_node.im
-                self.bug = Bug(im["event"]["name"], im["file"], im["line"])
+                self.bug = Bug(im.event.name if im.event else "", im.file, str(im.line))
             else:
                 self.bug = Bug("No bug found", "-", "0")
             self.bug_located()
@@ -67,20 +71,20 @@ class DebuggingScreen(QWidget):
         self.set_question_view(validation_widget)
         validation_widget.setLayout(QVBoxLayout())
 
-        event = im["event"]["name"]
-        instruction = im["event"]["instruction"]
-        if event[0] == "+":
+        event_name = im.event.name if im.event else ""
+        instruction = im.event.instruction if im.event else ""
+        if event_name[0] == "+":
             question = "Are goal instantiation and context correct?"
-            self.bug = Bug(f"Bug in adding goal {event}.", "", "")
+            self.bug = Bug(f"Bug in adding goal {event_name}.", "", "")
         else:
             question = "Is it 'acceptable' that the plan failed at this point?"
-            self.bug = Bug(f"Plan for {event} should not have failed.", "", "") # TODO show instruction causing the failure
+            self.bug = Bug(f"Plan for {event_name} should not have failed.", "", "") # TODO show instruction causing the failure
 
         validation_widget.layout().addWidget(QLabel(question))
-        validation_widget.layout().addWidget(QLabel(f"Goal (Event): {event}"))
+        validation_widget.layout().addWidget(QLabel(f"Goal (Event): {event_name}"))
         validation_widget.layout().addWidget(QLabel(f"Previous instruction: {instruction}"))
 
-        state_view = AgentStateView(self.agent_repo, self.selected_agent, im["event"]["cycle"])
+        state_view = AgentStateView(self.agent_repo, self.selected_agent, im.event.cycle if im.event else -1)
         validation_widget.layout().addWidget(state_view)
 
         btn_bar = QWidget()
@@ -104,9 +108,9 @@ class DebuggingScreen(QWidget):
         validation_widget.setLayout(QVBoxLayout())
 
         validation_widget.layout().addWidget(QLabel("Has the goal been achieved?"))
-        validation_widget.layout().addWidget(QLabel(f"Goal (Event): {im['event']['name']}"))
+        validation_widget.layout().addWidget(QLabel(f"Goal (Event): {im.get_event_name()}"))
 
-        state_view = AgentStateView(self.agent_repo, self.selected_agent, im["end"])
+        state_view = AgentStateView(self.agent_repo, self.selected_agent, im.end)
         validation_widget.layout().addWidget(state_view)
 
         btn_bar = QWidget()
@@ -144,6 +148,8 @@ class DebuggingScreen(QWidget):
 class DebuggingTreeView(QTreeWidget):
     def __init__(self, trees: list[JasonDebuggingTreeNode]):
         super(DebuggingTreeView, self).__init__()
+        self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.views = {}
         self.highlighted_node: Optional[JasonDebuggingTreeNode] = None
         self.color_std = QColor(0, 0, 0)
@@ -252,33 +258,31 @@ class BeliefView(TreeView):
 
 
 class IntentionView(TreeView):
-    def __init__(self, agent_data):
+    def __init__(self, agent_data: AgentData):
         super(IntentionView, self).__init__("Intentions")
         self.tree.setColumnWidth(0, 250)
         self.agent_data = agent_data
         self.tree.setHeaderLabels(["Event", "Trigger", "Context", "Result"])
 
-    def set_intentions(self, intentions: list, cycle: int):
+    def set_intentions(self, intentions: list[Intention], cycle: int):
         self.tree.clear()
         self.cycle = cycle
         for intention in intentions:
-            if not intention["means"]:
+            if not intention.means:
                 continue
-            root_im = intention["means"][0]
+            root_im = intention.means[0]
             self.add_im_recursive(root_im, self.tree.invisibleRootItem())
         self.tree.expandAll()
 
-    def add_im_recursive(self, im_id, parent_node: QTreeWidgetItem):
-        im = self.agent_data["means"][im_id]
-        if im["start"] > self.cycle:
+    def add_im_recursive(self, im, parent_node: QTreeWidgetItem):
+        if im.start > self.cycle:
             return
-        plan = self.agent_data["plans"][im["plan"]]
-        res = im["res"] if im["end"] < self.cycle else ""
-        node = QTreeWidgetItem([im["event"]["name"], plan["trigger"], plan.get("ctx", "T"), res])
-        if im["end"] < self.cycle:
+        res = im.res if im.end < self.cycle else ""
+        node = QTreeWidgetItem([im.event.name if im.event else "", im.plan.trigger, im.plan.context, res])
+        if im.end < self.cycle:
             node.setBackground(0, QColor(50,50,50))
         parent_node.addChild(node)
-        for child_im in im["children"]:
+        for child_im in im.children:
             self.add_im_recursive(child_im, node)
 
 

@@ -1,9 +1,8 @@
-import os
 import sys
-import json
 
 from PyQt6.QtWidgets import QApplication, QMainWindow
 
+from config import Config
 from gui.home import HomeScreen
 from gui.plan_selection import PlanSelectionScreen
 from gui.debugging import DebuggingScreen
@@ -30,7 +29,7 @@ class Application(QApplication):
             folder = self.config.get("current_folder")
         else:
             self.config.set("current_folder", folder)
-        self.window.setCentralWidget(PlanSelectionScreen(self))
+        self.window.setCentralWidget(PlanSelectionScreen(self.config, self.agent_repo, self.show_debugging))
 
     def show_debugging(self, selected_plan, selected_agent):
         self.window.setCentralWidget(DebuggingScreen(self, selected_plan, selected_agent))
@@ -43,41 +42,6 @@ class MainWindow(QMainWindow):
         self.resize(1280, 1024)
         self.frameGeometry().moveCenter(self.screen().availableGeometry().center())
         self.setWindowTitle("Declarative Agent Debugger")
-
-
-class Config():
-    def __init__(self):
-        if os.path.isfile("config.json"):
-            with open("config.json", "r") as config_file:
-                self.data = json.load(config_file)
-        else:
-            self.data = {
-                "previous_folders": [],
-                "current_folder": ""
-            }
-
-    def save(self):
-        with open("config.json", "w") as config_file:
-            json.dump(self.data, config_file)
-
-    def get_previous_folders(self):
-        self.data["previous_folders"] = list(filter(lambda path: os.path.isdir(path), self.data["previous_folders"]))
-        self.save()
-        return self.data["previous_folders"]
-
-    def add_previous_folder(self, folder):
-        previous_folders = self.data["previous_folders"]
-        if folder not in previous_folders:
-                previous_folders.insert(0, folder)
-                previous_folders = previous_folders[:10]
-                self.save()
-
-    def set(self, key, value):
-        self.data[key] = value
-        self.save()
-
-    def get(self, key):
-        return self.data.get(key, "")
 
 
 def main():
