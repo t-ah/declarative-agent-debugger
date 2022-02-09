@@ -26,7 +26,7 @@ class JasonDebuggingTreeNode:
 
     def append_child(self, node: "JasonDebuggingTreeNode"):
         if self.children:
-            self.children[-1].sibling = node
+            self.children[-1].next_sibling = node
         self.children.append(node)
         node.parent = self
 
