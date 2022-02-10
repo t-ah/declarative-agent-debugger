@@ -1,6 +1,6 @@
 from typing import Optional
 
-from PyQt6.QtWidgets import QWidget, QGridLayout, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidgetItem, QTreeWidget, QAbstractItemView
+from PyQt6.QtWidgets import QWidget, QGridLayout, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidgetItem, QTreeWidget, QAbstractItemView, QFormLayout
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 
@@ -24,7 +24,8 @@ class DebuggingScreen(QWidget):
 
         trees = DebuggingScreen.create_trees(self.agent_data, selected_plan)
         if not trees:
-            return # TODO show message
+            self.back() # TODO show message
+            return
         self.strategy = SimpleJasonNavigationStrategy(trees, self.agent_repo, selected_agent)
 
         self.tree_view = DebuggingTreeView(trees)
@@ -69,33 +70,31 @@ class DebuggingScreen(QWidget):
         im = node.im
         validation_widget = QWidget()
         self.set_question_view(validation_widget)
-        validation_widget.setLayout(QVBoxLayout())
+        validation_widget.setLayout(QFormLayout())
+        validation_widget.setStyleSheet("QLabel {font: 16pt}")
 
         event_name = im.event.name if im.event else ""
         instruction = im.event.instruction if im.event else ""
         if event_name[0] == "+":
-            question = "Are goal instantiation and context correct?"
+            question = "Was it correct to add the goal?"
             self.bug = Bug(f"Bug in adding goal {event_name}.", "", "")
         else:
             question = "Is it 'acceptable' that the plan failed at this point?"
             self.bug = Bug(f"Plan for {event_name} should not have failed.", "", "") # TODO show instruction causing the failure
 
-        validation_widget.layout().addWidget(QLabel(question))
-        validation_widget.layout().addWidget(QLabel(f"Goal (Event): {event_name}"))
-        validation_widget.layout().addWidget(QLabel(f"Previous instruction: {instruction}"))
+        validation_widget.layout().addRow("Question", QLabel(question))
+        validation_widget.layout().addRow("Goal (Event)", QLabel(event_name))
+        validation_widget.layout().addRow("Previous instruction", QLabel(instruction))
 
-        btn_bar = QWidget()
-        btn_bar.setLayout(QHBoxLayout())
-        btn_yes = QPushButton("Yes")
-        btn_yes.clicked.connect(lambda: self.goal_addition_validated(node))
-        btn_no = QPushButton("No")
-        btn_no.clicked.connect(self.bug_located)
-        for widget in [btn_yes, btn_no]:
-            btn_bar.layout().addWidget(widget)
-        validation_widget.layout().addWidget(btn_bar)
+        btn_bar = YesNoButtonBar()
+        btn_bar.btn_yes.clicked.connect(lambda: self.goal_addition_validated(node))
+        btn_bar.btn_no.clicked.connect(self.bug_located)
+        validation_widget.layout().addRow(btn_bar)
+
+        validation_widget.layout().addRow(QLabel(f"State when goal added (cycle {str(im.event.cycle) if im.event else '?'}):"))
 
         state_view = AgentStateView(self.agent_repo, self.selected_agent, im.event.cycle if im.event else -1)
-        validation_widget.layout().addWidget(state_view)
+        validation_widget.layout().addRow(state_view)
 
         self.set_question_view(validation_widget)
 
@@ -105,23 +104,21 @@ class DebuggingScreen(QWidget):
     def validate_goal_result(self, node: JasonDebuggingTreeNode):
         im = node.im
         validation_widget = QWidget()
-        validation_widget.setLayout(QVBoxLayout())
+        validation_widget.setLayout(QFormLayout())
+        validation_widget.setStyleSheet("QLabel {font: 16pt}")
 
-        validation_widget.layout().addWidget(QLabel("Has the goal been achieved?"))
-        validation_widget.layout().addWidget(QLabel(f"Goal (Event): {im.get_event_name()}"))
+        validation_widget.layout().addRow("Question", QLabel("Has the goal been achieved?"))
+        validation_widget.layout().addRow("Goal (Event)", QLabel(im.get_event_name()))
 
-        btn_bar = QWidget()
-        btn_bar.setLayout(QHBoxLayout())
-        btn_yes = QPushButton("Yes")
-        btn_yes.clicked.connect(self.goal_result_validated)
-        btn_no = QPushButton("No")
-        btn_no.clicked.connect(self.goal_result_invalidated)
-        for widget in [btn_yes, btn_no]:
-            btn_bar.layout().addWidget(widget)
-        validation_widget.layout().addWidget(btn_bar)
+        btn_bar = YesNoButtonBar()
+        btn_bar.btn_yes.clicked.connect(self.goal_result_validated)
+        btn_bar.btn_no.clicked.connect(self.goal_result_invalidated)
+        validation_widget.layout().addRow(btn_bar)
+
+        validation_widget.layout().addRow(QLabel(f"State after goal (cycle {im.end}):"))
 
         state_view = AgentStateView(self.agent_repo, self.selected_agent, im.end)
-        validation_widget.layout().addWidget(state_view)
+        validation_widget.layout().addRow(state_view)
 
         self.set_question_view(validation_widget)
 
@@ -143,6 +140,16 @@ class DebuggingScreen(QWidget):
 
     def back(self):
         self.app.show_plan_selection()
+
+
+class YesNoButtonBar(QWidget):
+    def __init__(self):
+        super(YesNoButtonBar, self).__init__()
+        self.setLayout(QHBoxLayout())
+        self.btn_yes = QPushButton("Yes")
+        self.btn_no = QPushButton("No")
+        self.layout().addWidget(self.btn_yes)
+        self.layout().addWidget(self.btn_no)
 
 
 class DebuggingTreeView(QTreeWidget):
