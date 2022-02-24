@@ -33,12 +33,12 @@ class AgentRepository:
 
         imeans_active = []
         for im_id, im in agent_data.intended_means.items():
-            if im.start <= cycle and im.end >= cycle:
+            if im.start <= cycle <= im.end:
                 imeans_active.append(im_id)
 
         intentions_active = []
         for intention in agent_data.intentions.values():
-            if intention.start <= cycle and intention.end >= cycle:
+            if intention.start <= cycle <= intention.end:
                 intentions_active.append(intention)
 
         state = {
@@ -90,7 +90,8 @@ class AgentRepository:
                 if "IM+" in cycle:
                     for im_data in cycle["IM+"]:
                         intention = data.intentions[im_data["i"]]
-                        im = IntendedMeans(im_data["id"], intention, cycle["nr"], sys.maxsize, "?", im_data["file"], im_data["line"], data.plans[im_data["plan"]], [], None, None)
+                        im = IntendedMeans(im_data["id"], intention, cycle["nr"], sys.maxsize, "?", im_data["file"],
+                                           im_data["line"], data.plans[im_data["plan"]], [], None, None)
                         intention.means.append(im)
                         im.plan.used += 1
                         data.intended_means[im_data["id"]] = im

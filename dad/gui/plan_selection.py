@@ -2,7 +2,8 @@ import os
 import json
 
 from PyQt6.QtGui import QStandardItem, QStandardItemModel
-from PyQt6.QtWidgets import QPushButton, QHBoxLayout, QLabel, QDialog, QTableView, QWidget, QHBoxLayout, QVBoxLayout, QDialogButtonBox
+from PyQt6.QtWidgets import QPushButton, QLabel, QDialog, QTableView, QWidget, QHBoxLayout, QVBoxLayout, \
+    QDialogButtonBox
 
 from config import Config
 from model.agent import AgentRepository
@@ -48,15 +49,15 @@ class PlanSelectionScreen(QWidget):
         self.plan_table.doubleClicked.connect(self.on_plan_double_clicked)
 
         folder = self.config.get("current_folder")
-        agent_infos = []
+        agent_info = []
         for filename in os.listdir(folder):
             if filename.endswith(".log"):
                 log_file_path = os.path.join(folder, filename)
                 with open(log_file_path, "r") as log_file:
                     log_info = json.loads(log_file.readline())
                     if log_info["entity"] == "agent":
-                        agent_infos.append(log_info)
-        for agent in agent_infos:
+                        agent_info.append(log_info)
+        for agent in agent_info:
             row = [QStandardItem(agent[x]) for x in ["name", "platform", "src"]]
             agent_model.appendRow(row)
 
@@ -73,7 +74,8 @@ class PlanSelectionScreen(QWidget):
         for label, plan in agent_data.plans.items():
             if plan.used == 0:
                 continue
-            self.plan_model.appendRow([QStandardItem(x) for x in [label, plan.trigger, plan.context, plan.body, str(plan.used)]])
+            self.plan_model.appendRow(
+                [QStandardItem(x) for x in [label, plan.trigger, plan.context, plan.body, str(plan.used)]])
 
 
 class IntentionSelectionDialog(QDialog):
@@ -83,7 +85,7 @@ class IntentionSelectionDialog(QDialog):
         message = QLabel(f"Selected plan\n{selected_plan}\n\nDebug specific intention or plan in general?")
         buttons = QDialogButtonBox.StandardButton.Cancel
         button_box = QDialogButtonBox(buttons)
-        button_box.rejected.connect(self.close)
+        button_box.rejected.connect(self.cancel)
 
         button_intention = QPushButton("One intention using the plan")
         button_plan = QPushButton("Entire plan (all intentions using the plan)")
@@ -92,8 +94,11 @@ class IntentionSelectionDialog(QDialog):
 
         self.setWindowTitle("Intention selection.")
         layout = QVBoxLayout()
-        self.layout.addWidget(message)
-        self.layout.addWidget(button_intention)
-        self.layout.addWidget(button_plan)
-        self.layout.addWidget(button_box)
+        self.layout().addWidget(message)
+        self.layout().addWidget(button_intention)
+        self.layout().addWidget(button_plan)
+        self.layout().addWidget(button_box)
         self.setLayout(layout)
+
+    def cancel(self):
+        self.close()

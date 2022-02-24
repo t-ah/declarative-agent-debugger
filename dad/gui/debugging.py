@@ -1,6 +1,7 @@
 from typing import Optional
 
-from PyQt6.QtWidgets import QWidget, QGridLayout, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidgetItem, QTreeWidget, QAbstractItemView, QFormLayout
+from PyQt6.QtWidgets import QWidget, QGridLayout, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidgetItem, \
+    QTreeWidget, QAbstractItemView, QFormLayout
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 
@@ -24,7 +25,7 @@ class DebuggingScreen(QWidget):
 
         trees = DebuggingScreen.create_trees(self.agent_data, selected_plan)
         if not trees:
-            self.back() # TODO show message
+            self.back()  # TODO show message
             return
         self.strategy = SimpleJasonNavigationStrategy(trees, self.agent_repo, selected_agent)
 
@@ -49,7 +50,8 @@ class DebuggingScreen(QWidget):
         result_view = ResultView()
         self.set_question_view(result_view)
         if self.bug:
-            result_view.add_message(f"Bug located in {self.bug.file} line {self.bug.location}. Reason: {self.bug.reason}")
+            result_view.add_message(
+                f"Bug located in {self.bug.file} line {self.bug.location}. Reason: {self.bug.reason}")
 
     def debug(self):
         next_node = self.strategy.get_next()
@@ -80,7 +82,8 @@ class DebuggingScreen(QWidget):
             self.bug = Bug(f"Bug in adding goal {event_name}.", "", "")
         else:
             question = "Is it 'acceptable' that the plan failed at this point?"
-            self.bug = Bug(f"Plan for {event_name} should not have failed.", "", "") # TODO show instruction causing the failure
+            self.bug = Bug(f"Plan for {event_name} should not have failed.", "",
+                           "")  # TODO show instruction causing the failure
 
         validation_widget.layout().addRow("Question", QLabel(question))
         validation_widget.layout().addRow("Goal (Event)", QLabel(event_name))
@@ -91,7 +94,8 @@ class DebuggingScreen(QWidget):
         btn_bar.btn_no.clicked.connect(self.bug_located)
         validation_widget.layout().addRow(btn_bar)
 
-        validation_widget.layout().addRow(QLabel(f"State when goal added (cycle {str(im.event.cycle) if im.event else '?'}):"))
+        validation_widget.layout().addRow(
+            QLabel(f"State when goal added (cycle {str(im.event.cycle) if im.event else '?'}):"))
 
         state_view = AgentStateView(self.agent_repo, self.selected_agent, im.event.cycle if im.event else -1)
         validation_widget.layout().addRow(state_view)
@@ -214,7 +218,7 @@ class AgentStateView(QWidget):
 
         btn_prev = QPushButton("Prev")
         btn_next = QPushButton("Next")
-        self.cycle_label = QLabel(str(start_cycle)) # TODO jump to cycle
+        self.cycle_label = QLabel(str(start_cycle))  # TODO jump to cycle
         cycle_bar = QWidget()
         cycle_bar_layout = QHBoxLayout()
         cycle_bar.setLayout(cycle_bar_layout)
@@ -223,7 +227,7 @@ class AgentStateView(QWidget):
         cycle_bar_layout.addWidget(btn_next)
         btn_prev.clicked.connect(self.prev_cycle)
         btn_next.clicked.connect(self.next_cycle)
-        self.layout().addWidget(cycle_bar) # TODO reset button for jumping back to original cycle
+        self.layout().addWidget(cycle_bar)  # TODO reset button for jumping back to original cycle
 
         self.show_cycle(self.start_cycle)
 
@@ -286,7 +290,7 @@ class IntentionView(TreeView):
         res = im.res if im.end < self.cycle else ""
         node = QTreeWidgetItem([im.event.name if im.event else "", im.plan.trigger, im.plan.context, res])
         if im.end < self.cycle:
-            node.setBackground(0, QColor(50,50,50))
+            node.setBackground(0, QColor(50, 50, 50))
         parent_node.addChild(node)
         for child_im in im.children:
             self.add_im_recursive(child_im, node)
@@ -306,7 +310,6 @@ class Bug:
         self.reason = reason
         self.file = file
         self.location = location
-
 
 # class ValidationView(QWidget):
 #     def __init__(self, controller: DebuggingScreen):

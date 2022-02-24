@@ -25,7 +25,7 @@ class Application(QApplication):
         self.window.setCentralWidget(HomeScreen(self))
 
     def show_plan_selection(self, folder=None):
-        if folder == None:
+        if folder is None:
             folder = self.config.get("current_folder")
         else:
             self.config.set("current_folder", folder)

@@ -29,7 +29,8 @@ class HomeScreen(QWidget):
 
     def on_open_button_clicked(self):
         current_folder = self.app.config.get("current_folder")
-        folder = get_path_from_user(parent=self, caption="Select log directory", path=current_folder[:current_folder.rfind("/")])
+        folder = get_path_from_user(parent=self, caption="Select log directory",
+                                    path=current_folder[:current_folder.rfind("/")])
         if folder != "":
             self.app.config.add_previous_folder(folder)
             self.app.show_plan_selection(folder)

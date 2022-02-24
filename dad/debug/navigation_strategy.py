@@ -47,12 +47,13 @@ class SimpleJasonNavigationStrategy:
         self.prev_node: Optional[JasonDebuggingTreeNode] = None
         self.final_bug: Optional[JasonDebuggingTreeNode] = None
 
-    def mark_node(self, node: JasonDebuggingTreeNode, result: Result):
+    @staticmethod
+    def mark_node(node: JasonDebuggingTreeNode, result: Result):
         node.state = result
 
     def get_next(self):
         if not self.prev_node:
-            root = self.trees[0] # FIXME consider all trees later
+            root = self.trees[0]  # FIXME consider all trees later
             self.prev_node = root
             return root
 
