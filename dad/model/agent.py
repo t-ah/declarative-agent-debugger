@@ -87,6 +87,17 @@ class AgentRepository:
                 if "I+" in cycle:
                     intention = Intention(cycle["I+"], cycle["nr"], sys.maxsize, [], [])
                     data.intentions[cycle["I+"]] = intention
+                if "E+" in cycle:
+                    for event_data in cycle["E+"]:
+                        event_id, event_content = event_data.split(": ")
+                        if "SE" in cycle and int(event_id) == cycle["SE"]:  # event added and selected in same step
+                            instr = ""  # instruction did not cause the event
+                        else:
+                            instr = cycle["I"]["instr"] if "I" in cycle else ""
+                        event = BDIEvent(None, cycle["nr"], event_content, instr, -1)
+                        data.events[int(event_id)] = event
+                        if "I" in cycle and "im" in cycle["I"]:  # TODO: log I?
+                            event.parent = data.intended_means[cycle["I"]["im"]]
                 if "IM+" in cycle:
                     for im_data in cycle["IM+"]:
                         intention = data.intentions[im_data["i"]]
@@ -113,14 +124,6 @@ class AgentRepository:
                         im.res = im_data.get("res", "?")
                 if "I-" in cycle:
                     data.intentions[cycle["I-"]].end = cycle["nr"]
-                if "E+" in cycle:
-                    for event_data in cycle["E+"]:
-                        event_id, event_content = event_data.split(": ")
-                        instr = cycle["I"]["instr"] if "I" in cycle else ""
-                        event = BDIEvent(None, cycle["nr"], event_content, instr, -1)
-                        data.events[int(event_id)] = event
-                        if "I" in cycle and "im" in cycle["I"]:
-                            event.parent = data.intended_means[cycle["I"]["im"]]
                 if "SE" in cycle:
                     selected_event_id = cycle["SE"]
                     data.events[selected_event_id].selected = cycle["nr"]
