@@ -19,9 +19,9 @@ class DebuggingScreen(QWidget):
         self.agent_data = self.agent_repo.get_agent_data(selected_agent)
         self.grid = QGridLayout()
         self.setLayout(self.grid)
-        self.node: JasonDebuggingTreeNode
+        self.node: Optional[JasonDebuggingTreeNode] = None
         self.question_view: Optional[QWidget] = None
-        self.bug: Bug
+        self.bug: Optional[Bug] = None
 
         trees = DebuggingScreen.create_trees(self.agent_data, selected_plan)
         if not trees:
@@ -76,7 +76,7 @@ class DebuggingScreen(QWidget):
         validation_widget.setStyleSheet("QLabel {font: 16pt}")
 
         event_name = im.event.name if im.event else ""
-        instruction = im.event.instruction if im.event else ""
+        cause = f"Parent goal: {im.parent.event.name}" if im.event and im.event.instruction != "" else "Percept"
         if event_name[0] == "+":
             question = "Was it correct to add the goal?"
             self.bug = Bug(f"Bug in adding goal {event_name}.", "", "")
@@ -87,7 +87,7 @@ class DebuggingScreen(QWidget):
 
         validation_widget.layout().addRow("Question", QLabel(question))
         validation_widget.layout().addRow("Goal (Event)", QLabel(event_name))
-        validation_widget.layout().addRow("Previous instruction", QLabel(instruction))
+        validation_widget.layout().addRow("Cause", QLabel(cause))
 
         btn_bar = YesNoButtonBar()
         btn_bar.btn_yes.clicked.connect(lambda: self.goal_addition_validated(node))
@@ -270,6 +270,7 @@ class BeliefView(TreeView):
 class IntentionView(TreeView):
     def __init__(self, agent_data: AgentData):
         super(IntentionView, self).__init__("Intentions")
+        self.cycle = -1
         self.tree.setColumnWidth(0, 250)
         self.agent_data = agent_data
         self.tree.setHeaderLabels(["Event", "Trigger", "Context", "Result"])
