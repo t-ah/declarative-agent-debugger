@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Generator
 
 from model.bdi import IntendedMeans
 from model.agent import AgentRepository, AgentData
@@ -13,16 +13,16 @@ class Result(Enum):
 
 
 class JasonDebuggingTreeNode:
-    def __init__(self, agent_data: AgentData, im: IntendedMeans, parent=None):
-        self.label = f'{im.get_event_name()} intention={im.intention.id}'
-        self.children = []
-        self.parent = parent
+    def __init__(self, agent_data: AgentData, im: IntendedMeans):
+        self.label = im.trigger
+        self.children: list[JasonDebuggingTreeNode] = []
+        self.parent: Optional[JasonDebuggingTreeNode] = None
         self.next_sibling: Optional[JasonDebuggingTreeNode] = None
         self.state = Result.Undecided
         self.im = im
         for child_im in im.children:
-            node = JasonDebuggingTreeNode(agent_data, child_im)
-            self.append_child(node)
+            child_node = JasonDebuggingTreeNode(agent_data, child_im)
+            self.append_child(child_node)
 
     def append_child(self, node: "JasonDebuggingTreeNode"):
         if self.children:
@@ -30,7 +30,7 @@ class JasonDebuggingTreeNode:
         self.children.append(node)
         node.parent = self
 
-    def traverse(self):
+    def traverse(self) -> Generator["JasonDebuggingTreeNode", None, None]:
         yield self
         for child in self.children:
             yield from child.traverse()

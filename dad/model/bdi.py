@@ -7,7 +7,6 @@ class BDIEvent:
     parent: Optional["IntendedMeans"]
     cycle: int
     name: str
-    instruction: str
     selected: int
 
 
@@ -21,6 +20,7 @@ class IntendedMeans:
     file: str
     line: int
     plan: "Plan"
+    trigger: str
     children: list["IntendedMeans"]
     parent: Optional["IntendedMeans"]
     event: Optional[BDIEvent]
@@ -36,6 +36,7 @@ class Intention:
     end: int
     means: list[IntendedMeans]
     instructions: list[str]
+    events: list[BDIEvent]
 
 
 @dataclass

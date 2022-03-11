@@ -75,18 +75,16 @@ class DebuggingScreen(QWidget):
         validation_widget.setLayout(QFormLayout())
         validation_widget.setStyleSheet("QLabel {font: 16pt}")
 
-        event_name = im.event.name if im.event else ""
-        cause = f"Parent goal: {im.parent.event.name}" if im.event and im.event.instruction != "" else "Percept"
-        if event_name[0] == "+":
+        cause = f"Parent goal: {im.parent.trigger}" if im.parent else "Percept"
+        if im.trigger[0] == "+":
             question = "Was it correct to add the goal?"
-            self.bug = Bug(f"Bug in adding goal {event_name}.", "", "")
+            self.bug = Bug(f"Bug in adding goal {im.trigger}.", "", "")
         else:
             question = "Is it 'acceptable' that the plan failed at this point?"
-            self.bug = Bug(f"Plan for {event_name} should not have failed.", "",
-                           "")  # TODO show instruction causing the failure
+            self.bug = Bug(f"Plan for {im.trigger} should not have failed.", "", "")  # TODO show causing instr
 
         validation_widget.layout().addRow("Question", QLabel(question))
-        validation_widget.layout().addRow("Goal (Event)", QLabel(event_name))
+        validation_widget.layout().addRow("Goal (Trigger)", QLabel(im.trigger))
         validation_widget.layout().addRow("Cause", QLabel(cause))
 
         btn_bar = YesNoButtonBar()
@@ -94,10 +92,12 @@ class DebuggingScreen(QWidget):
         btn_bar.btn_no.clicked.connect(self.bug_located)
         validation_widget.layout().addRow(btn_bar)
 
-        validation_widget.layout().addRow(
-            QLabel(f"State when goal added (cycle {str(im.event.cycle) if im.event else '?'}):"))
+        cycle = im.event.cycle if im.event else im.start
 
-        state_view = AgentStateView(self.agent_repo, self.selected_agent, im.event.cycle if im.event else -1)
+        validation_widget.layout().addRow(
+            QLabel(f"State when goal added (cycle {str(cycle)}):"))
+
+        state_view = AgentStateView(self.agent_repo, self.selected_agent, cycle)
         validation_widget.layout().addRow(state_view)
 
         self.set_question_view(validation_widget)
@@ -112,7 +112,7 @@ class DebuggingScreen(QWidget):
         validation_widget.setStyleSheet("QLabel {font: 16pt}")
 
         validation_widget.layout().addRow("Question", QLabel("Has the goal been achieved?"))
-        validation_widget.layout().addRow("Goal (Event)", QLabel(im.get_event_name()))
+        validation_widget.layout().addRow("Goal (Trigger)", QLabel(im.trigger))
 
         btn_bar = YesNoButtonBar()
         btn_bar.btn_yes.clicked.connect(self.goal_result_validated)
@@ -164,7 +164,7 @@ class DebuggingTreeView(QTreeWidget):
         self.views = {}
         self.highlighted_node: Optional[JasonDebuggingTreeNode] = None
         self.color_std = QColor(0, 0, 0)
-        self.color_highlight = QColor(0, 100, 100)
+        self.color_highlight = QColor(0, 10, 100)
         self.color_valid = QColor(0, 150, 0)
         self.color_invalid = QColor(150, 0, 0)
 

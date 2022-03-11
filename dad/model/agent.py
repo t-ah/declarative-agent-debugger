@@ -84,35 +84,36 @@ class AgentRepository:
 
             for line in log_file.readlines():
                 cycle = json.loads(line)
+                temp_ims = []
                 if "I+" in cycle:
-                    intention = Intention(cycle["I+"], cycle["nr"], sys.maxsize, [], [])
+                    intention = Intention(cycle["I+"], cycle["nr"], sys.maxsize, [], [], [])
                     data.intentions[cycle["I+"]] = intention
-                if "E+" in cycle:
-                    for event_data in cycle["E+"]:
-                        event_id, event_content = event_data.split(": ")
-                        if "SE" in cycle and int(event_id) == cycle["SE"]:  # event added and selected in same step
-                            instr = ""  # instruction did not cause the event
-                        else:
-                            instr = cycle["I"]["instr"] if "I" in cycle else ""
-                        event = BDIEvent(None, cycle["nr"], event_content, instr, -1)
-                        data.events[int(event_id)] = event
-                        if "I" in cycle and "im" in cycle["I"]:  # TODO: log I?
-                            event.parent = data.intended_means[cycle["I"]["im"]]
                 if "IM+" in cycle:
                     for im_data in cycle["IM+"]:
                         intention = data.intentions[im_data["i"]]
                         im = IntendedMeans(im_data["id"], intention, cycle["nr"], sys.maxsize, "?", im_data["file"],
-                                           im_data["line"], data.plans[im_data["plan"]], [], None, None)
+                                           im_data["line"], data.plans[im_data["plan"]], im_data["trigger"], [], None,
+                                           None)
                         intention.means.append(im)
+                        temp_ims.append(im)
                         im.plan.used += 1
                         data.intended_means[im_data["id"]] = im
-                        causing_event_id = cycle["SE"]
-                        causing_event = data.events[causing_event_id]
-                        im.event = causing_event
-                        if causing_event.parent:
-                            parent_im = causing_event.parent
+
+                        if "parent" in im_data:
+                            parent_im_id = int(im_data["parent"])
+                            parent_im = data.intended_means[parent_im_id]
                             im.parent = parent_im
                             parent_im.children.append(im)
+                if "E+" in cycle:
+                    for event_data in cycle["E+"]:
+                        ev_id, trigger = event_data.split(": ")
+                        event = BDIEvent(None, cycle["nr"], trigger, -1)
+                        if ev_id != "B":  # max. 1 event of this type
+                            parent_im_id = int(ev_id)
+                            event.parent = data.intended_means[parent_im_id]
+                            event.parent.intention.events.append(event)
+                        else:
+                            pass  # TODO see other TODO below
                 if "SI" in cycle:
                     intention = data.intentions[cycle["SI"]]
                     if "I" in cycle:
@@ -124,9 +125,26 @@ class AgentRepository:
                         im.res = im_data.get("res", "?")
                 if "I-" in cycle:
                     data.intentions[cycle["I-"]].end = cycle["nr"]
-                if "SE" in cycle:
-                    selected_event_id = cycle["SE"]
-                    data.events[selected_event_id].selected = cycle["nr"]
+                if "SE" in cycle:  # E+ and IM+ need to be processed before SE
+                    event_data = cycle["SE"]
+                    ev_id, trigger = event_data.split(": ")
+                    if ev_id != "B":
+                        intention_id = int(ev_id)
+                        intention = data.intentions[intention_id]
+                        event = intention.events[-1]
+                        event.selected = cycle["nr"]
+                    else:
+                        event = BDIEvent(None, cycle["nr"], trigger, cycle["nr"])
+                        intention_id = cycle["I+"]  # SE with B-id means a new intention is created
+                        intention = data.intentions[intention_id]
+                        intention.events.append(event)
+                        # TODO when was the event actually posted?
+                    for im in temp_ims:
+                        im.event = event
+                    #     if event.parent:
+                    #         im.parent = event.parent
+                    #         event.parent.children.append(im)
+                    #         # print(f"{im.plan.trigger} --> {im.parent.plan.trigger}")
                 if "B+" in cycle:
                     for belief in cycle["B+"]:
                         data.beliefs.append(BeliefChange(cycle["nr"], True, belief))
