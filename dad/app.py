@@ -39,7 +39,7 @@ class MainWindow(QMainWindow):
     def __init__(self, app):
         super(MainWindow, self).__init__()
         self.app = app
-        self.resize(1280, 1024)
+        self.resize(1920, 1024)
         self.frameGeometry().moveCenter(self.screen().availableGeometry().center())
         self.setWindowTitle("Declarative Agent Debugger")
 
