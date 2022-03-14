@@ -167,6 +167,7 @@ class DebuggingTreeView(QTreeWidget):
         self.color_highlight = QColor(0, 10, 100)
         self.color_valid = QColor(0, 150, 0)
         self.color_invalid = QColor(150, 0, 0)
+        self.setHeaderLabels(["Debugging Tree"])
 
         for tree in trees:
             for node in tree.traverse():
