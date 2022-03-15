@@ -1,6 +1,6 @@
 import os
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QListView
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QListView, QHBoxLayout
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
 from gui.util import get_path_from_user, info
@@ -14,9 +14,11 @@ class HomeScreen(QWidget):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        open_button = QPushButton("Open new")
+        button_bar = QWidget()
+        QHBoxLayout(button_bar)
+        open_button = QPushButton("Open new", button_bar)
         open_button.clicked.connect(self.on_open_button_clicked)
-        layout.addWidget(open_button)
+        button_bar.layout().addStretch()
 
         self.previous_folder_list = QListView()
         self.previous_folder_list.doubleClicked.connect(self.on_list_double_clicked)
@@ -25,6 +27,8 @@ class HomeScreen(QWidget):
         for folder in self.app.config.get_previous_folders():
             item = QStandardItem(folder)
             model.appendRow(item)
+
+        layout.addWidget(button_bar)
         layout.addWidget(self.previous_folder_list)
 
     def on_open_button_clicked(self):
