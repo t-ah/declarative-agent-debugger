@@ -16,7 +16,7 @@ class DebuggingScreen(QWidget):
         self.app = app
         self.agent_repo = self.app.agent_repo
         self.selected_agent = selected_agent
-        self.agent_data = self.agent_repo.get_agent_data(selected_agent)
+        self.agent_data: AgentData = self.agent_repo.get_agent_data(selected_agent)
         self.node: Optional[JasonDebuggingTreeNode] = None
         self.question_view: Optional[QWidget] = None
         self.bug: Optional[Bug] = None
@@ -61,6 +61,8 @@ class DebuggingScreen(QWidget):
         if self.bug:
             result_view.add_message(
                 f"Bug located in {self.bug.file} line {self.bug.location}. Reason: {self.bug.reason}")
+            result_view.add_message(f"Code:\n{self.bug.code}")
+            result_view.finalize()
 
     def debug(self):
         next_node = self.strategy.get_next()
@@ -72,9 +74,9 @@ class DebuggingScreen(QWidget):
             buggy_node = self.strategy.final_bug
             if buggy_node:
                 im = buggy_node.im
-                self.bug = Bug(im.event.name if im.event else "", im.file, str(im.line))
+                self.bug = Bug(im.event.name if im.event else "", im.file, str(im.line), code=im.plan.readable())
             else:
-                self.bug = Bug("No bug found", "-", "0")
+                self.bug = Bug("No bug found", "-", "-")
             self.bug_located()
 
     def validate_goal_addition(self, node: JasonDebuggingTreeNode):
@@ -317,9 +319,13 @@ class ResultView(QWidget):
     def add_message(self, msg):
         self.layout().addWidget(QLabel(msg))
 
+    def finalize(self):
+        self.layout().addStretch()
+
 
 class Bug:
-    def __init__(self, reason: str, file: str, location: str):
+    def __init__(self, reason: str, file: str, location: str, code=""):
         self.reason = reason
         self.file = file
         self.location = location
+        self.code = code

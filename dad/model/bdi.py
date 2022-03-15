@@ -55,3 +55,7 @@ class Plan:
     file: str
     line: int
     used: int = 0
+
+    def readable(self) -> str:
+        f_body = ";\n".join(["\t" + x for x in self.body.split("; ")])
+        return f"{self.trigger} : {self.context} <-\n{f_body}."
