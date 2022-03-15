@@ -122,6 +122,7 @@ class DebuggingScreen(QWidget):
 
         validation_widget.layout().addRow("Question", QLabel("Has the goal been achieved?"))
         validation_widget.layout().addRow("Goal (Trigger)", QLabel(im.trigger))
+        validation_widget.layout().addRow("", QLabel(""))
 
         btn_bar = YesNoButtonBar()
         btn_bar.btn_yes.clicked.connect(self.goal_result_validated)
