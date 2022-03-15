@@ -1,7 +1,7 @@
 from typing import Optional
 
-from PyQt6.QtWidgets import QWidget, QGridLayout, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidgetItem, \
-    QTreeWidget, QAbstractItemView, QFormLayout
+from PyQt6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidgetItem, \
+    QTreeWidget, QAbstractItemView, QFormLayout, QSplitter
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 
@@ -17,11 +17,17 @@ class DebuggingScreen(QWidget):
         self.agent_repo = self.app.agent_repo
         self.selected_agent = selected_agent
         self.agent_data = self.agent_repo.get_agent_data(selected_agent)
-        self.grid = QGridLayout()
-        self.setLayout(self.grid)
         self.node: Optional[JasonDebuggingTreeNode] = None
         self.question_view: Optional[QWidget] = None
         self.bug: Optional[Bug] = None
+
+        QHBoxLayout(self)
+        self.splitter = QSplitter()
+        tree_pane = QWidget(self.splitter)
+        QVBoxLayout(tree_pane)
+        self.question_view_container = QWidget(self.splitter)
+        QHBoxLayout(self.question_view_container)
+        self.layout().addWidget(self.splitter)
 
         trees = DebuggingScreen.create_trees(self.agent_data, selected_plan)
         if not trees:
@@ -30,10 +36,13 @@ class DebuggingScreen(QWidget):
         self.strategy = SimpleJasonNavigationStrategy(trees, self.agent_repo, selected_agent)
 
         self.tree_view = DebuggingTreeView(trees)
-        self.grid.addWidget(self.tree_view, 0, 0)
+        tree_pane.layout().addWidget(self.tree_view)
 
-        back_button = QPushButton("Back")
-        self.grid.addWidget(back_button, 1, 0)
+        button_bar = QWidget()
+        tree_pane.layout().addWidget(button_bar)
+        back_button = QPushButton("Back", button_bar)
+        QHBoxLayout(button_bar)
+        button_bar.layout().addStretch()
         back_button.clicked.connect(self.back)
 
         self.debug()
@@ -138,9 +147,9 @@ class DebuggingScreen(QWidget):
 
     def set_question_view(self, view: QWidget):
         if self.question_view:
-            self.grid.removeWidget(self.question_view)
+            self.question_view_container.layout().removeWidget(self.question_view)
         self.question_view = view
-        self.grid.addWidget(view, 0, 1)
+        self.question_view_container.layout().addWidget(view)
 
     def back(self):
         self.app.show_plan_selection()
@@ -154,6 +163,7 @@ class YesNoButtonBar(QWidget):
         self.btn_no = QPushButton("No")
         self.layout().addWidget(self.btn_yes)
         self.layout().addWidget(self.btn_no)
+        self.layout().addStretch()
 
 
 class DebuggingTreeView(QTreeWidget):
@@ -221,11 +231,11 @@ class AgentStateView(QWidget):
         btn_next = QPushButton("Next")
         self.cycle_label = QLabel(str(start_cycle))  # TODO jump to cycle
         cycle_bar = QWidget()
-        cycle_bar_layout = QHBoxLayout()
-        cycle_bar.setLayout(cycle_bar_layout)
-        cycle_bar_layout.addWidget(btn_prev)
-        cycle_bar_layout.addWidget(self.cycle_label)
-        cycle_bar_layout.addWidget(btn_next)
+        QHBoxLayout(cycle_bar)
+        cycle_bar.layout().addWidget(btn_prev)
+        cycle_bar.layout().addWidget(self.cycle_label)
+        cycle_bar.layout().addWidget(btn_next)
+        cycle_bar.layout().addStretch()
         btn_prev.clicked.connect(self.prev_cycle)
         btn_next.clicked.connect(self.next_cycle)
         self.layout().addWidget(cycle_bar)  # TODO reset button for jumping back to original cycle
