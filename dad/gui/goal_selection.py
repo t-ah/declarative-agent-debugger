@@ -53,6 +53,9 @@ class GoalSelectionScreen(QWidget):
         for agent in agent_info:
             row = [QStandardItem(agent[x]) for x in ["name", "platform", "src"]]
             agent_model.appendRow(row)
+        if agent_info:
+            self.agent_table.selectRow(0)
+            self.update_agent_selected()
 
         self.tab_widget.addTab(self.intention_table, "Intentions")
         setup_table(table=self.intention_table, model=self.intention_model,
