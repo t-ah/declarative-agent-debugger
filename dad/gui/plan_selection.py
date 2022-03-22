@@ -3,7 +3,7 @@ import json
 
 from PyQt6.QtGui import QStandardItem, QStandardItemModel
 from PyQt6.QtWidgets import QPushButton, QLabel, QDialog, QTableView, QWidget, QHBoxLayout, QVBoxLayout, \
-    QDialogButtonBox, QSplitter
+    QDialogButtonBox, QSplitter, QTabWidget
 
 from config import Config
 from model.agent import AgentRepository
@@ -23,6 +23,7 @@ class PlanSelectionScreen(QWidget):
         self.plan_model = QStandardItemModel()
         self.selected_agent = None
         QHBoxLayout(self)
+        self.tab_widget = QTabWidget()
 
         agent_pane = QWidget()
         agent_pane_layout = QVBoxLayout(agent_pane)
@@ -34,16 +35,6 @@ class PlanSelectionScreen(QWidget):
                     column_widths=[150, 100, 250])
         self.agent_table.clicked.connect(self.update_visible_plans)
         agent_pane_layout.addWidget(self.agent_table)
-        
-        plans_pane = QWidget()
-        plans_pane_layout = QVBoxLayout(plans_pane)
-        plans_pane_layout.addWidget(QLabel("Plans used"))
-
-        plans_pane_layout.addWidget(self.plan_table)
-        setup_table(table=self.plan_table, model=self.plan_model,
-                    labels=["Label", "Trigger", "Context", "Body", "Times used"],
-                    column_widths=[300, 250, 250])
-        self.plan_table.doubleClicked.connect(self.on_plan_double_clicked)
 
         folder = self.config.get("current_folder")
         agent_info = []
@@ -57,11 +48,17 @@ class PlanSelectionScreen(QWidget):
         for agent in agent_info:
             row = [QStandardItem(agent[x]) for x in ["name", "platform", "src"]]
             agent_model.appendRow(row)
+        
+        self.tab_widget.addTab(self.plan_table, "Plans")
+        setup_table(table=self.plan_table, model=self.plan_model,
+                    labels=["Label", "Trigger", "Context", "Body", "Times used"],
+                    column_widths=[300, 250, 250])
+        self.plan_table.doubleClicked.connect(self.on_plan_double_clicked)
 
         splitter = QSplitter()
         self.layout().addWidget(splitter)
         splitter.addWidget(agent_pane)
-        splitter.addWidget(plans_pane)
+        splitter.addWidget(self.tab_widget)
         splitter.setSizes([200, 500])
 
     def on_plan_double_clicked(self):
