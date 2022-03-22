@@ -21,6 +21,7 @@ class IntendedMeans:
     line: int
     plan: "Plan"
     trigger: str
+    context: str
     children: list["IntendedMeans"]
     parent: Optional["IntendedMeans"]
     event: Optional[BDIEvent]

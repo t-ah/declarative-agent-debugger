@@ -92,8 +92,8 @@ class AgentRepository:
                     for im_data in cycle["IM+"]:
                         intention = data.intentions[im_data["i"]]
                         im = IntendedMeans(im_data["id"], intention, cycle["nr"], sys.maxsize, "?", im_data["file"],
-                                           im_data["line"], data.plans[im_data["plan"]], im_data["trigger"], [], None,
-                                           None)
+                                           im_data["line"], data.plans[im_data["plan"]], im_data["trigger"],
+                                           im_data["ctx"], [], None, None)
                         intention.means.append(im)
                         temp_ims.append(im)
                         im.plan.used += 1

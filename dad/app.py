@@ -31,8 +31,8 @@ class Application(QApplication):
             self.config.set("current_folder", folder)
         self.window.setCentralWidget(PlanSelectionScreen(self.config, self.agent_repo, self.show_debugging))
 
-    def show_debugging(self, selected_plan, selected_agent):
-        self.window.setCentralWidget(DebuggingScreen(self, selected_plan, selected_agent))
+    def show_debugging(self, selected_im: int, selected_agent: str):
+        self.window.setCentralWidget(DebuggingScreen(self, selected_im, selected_agent))
 
 
 class MainWindow(QMainWindow):

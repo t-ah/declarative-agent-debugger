@@ -11,7 +11,7 @@ from debug.navigation_strategy import JasonDebuggingTreeNode, SimpleJasonNavigat
 
 
 class DebuggingScreen(QWidget):
-    def __init__(self, app, selected_plan, selected_agent: str):
+    def __init__(self, app, selected_goal: int, selected_agent: str):
         super(DebuggingScreen, self).__init__()
         self.app = app
         self.agent_repo = self.app.agent_repo
@@ -29,13 +29,10 @@ class DebuggingScreen(QWidget):
         QHBoxLayout(self.question_view_container)
         self.layout().addWidget(self.splitter)
 
-        trees = DebuggingScreen.create_trees(self.agent_data, selected_plan)
-        if not trees:
-            self.back()  # TODO show message
-            return
-        self.strategy = SimpleJasonNavigationStrategy(trees, self.agent_repo, selected_agent)
+        tree = DebuggingScreen.create_tree(self.agent_data, selected_goal)
+        self.strategy = SimpleJasonNavigationStrategy(tree, self.agent_repo, selected_agent)
 
-        self.tree_view = DebuggingTreeView(trees)
+        self.tree_view = DebuggingTreeView(tree)
         tree_pane.layout().addWidget(self.tree_view)
 
         button_bar = QWidget()
@@ -48,12 +45,8 @@ class DebuggingScreen(QWidget):
         self.debug()
 
     @staticmethod
-    def create_trees(agent_data: AgentData, selected_plan: str) -> list[JasonDebuggingTreeNode]:
-        result = []
-        for im in agent_data.intended_means.values():
-            if im.plan.label == selected_plan:
-                result.append(JasonDebuggingTreeNode(agent_data, im))
-        return result
+    def create_tree(agent_data: AgentData, selected_im: int) -> JasonDebuggingTreeNode:
+        return JasonDebuggingTreeNode(agent_data, agent_data.intended_means.get(selected_im))
 
     def bug_located(self):
         result_view = ResultView()
@@ -170,7 +163,7 @@ class YesNoButtonBar(QWidget):
 
 
 class DebuggingTreeView(QTreeWidget):
-    def __init__(self, trees: list[JasonDebuggingTreeNode]):
+    def __init__(self, tree: JasonDebuggingTreeNode):
         super(DebuggingTreeView, self).__init__()
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -182,12 +175,11 @@ class DebuggingTreeView(QTreeWidget):
         self.color_invalid = QColor(150, 0, 0)
         self.setHeaderLabels(["Debugging Tree"])
 
-        for tree in trees:
-            for node in tree.traverse():
-                node_view = DebuggingTreeView.create_node(node.label)
-                self.views[node] = node_view
-                parent_view = self.views[node.parent] if node.parent else self.invisibleRootItem()
-                parent_view.addChild(node_view)
+        for node in tree.traverse():
+            node_view = DebuggingTreeView.create_node(node.label)
+            self.views[node] = node_view
+            parent_view = self.views[node.parent] if node.parent else self.invisibleRootItem()
+            parent_view.addChild(node_view)
         self.expandAll()
 
     @staticmethod

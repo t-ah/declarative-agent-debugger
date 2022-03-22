@@ -37,12 +37,11 @@ class JasonDebuggingTreeNode:
 
 
 class SimpleJasonNavigationStrategy:
-    def __init__(self, trees: list[JasonDebuggingTreeNode], agent_repo: AgentRepository, agent_name: str):
-        self.trees = trees
+    def __init__(self, tree: JasonDebuggingTreeNode, agent_repo: AgentRepository, agent_name: str):
+        self.tree = tree
         self.agent_repo = agent_repo
-        for tree in self.trees:
-            for node in tree.traverse():
-                node.state = Result.Undecided
+        for node in tree.traverse():
+            node.state = Result.Undecided
         self.agent_name = agent_name
         self.prev_node: Optional[JasonDebuggingTreeNode] = None
         self.final_bug: Optional[JasonDebuggingTreeNode] = None
@@ -53,9 +52,8 @@ class SimpleJasonNavigationStrategy:
 
     def get_next(self):
         if not self.prev_node:
-            root = self.trees[0]  # FIXME consider all trees later
-            self.prev_node = root
-            return root
+            self.prev_node = self.tree
+            return self.tree
 
         node = self.prev_node
         if node.state == Result.Invalid:
