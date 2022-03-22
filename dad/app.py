@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QApplication, QMainWindow
 
 from config import Config
 from gui.home import HomeScreen
-from gui.plan_selection import PlanSelectionScreen
+from gui.goal_selection import GoalSelectionScreen
 from gui.debugging import DebuggingScreen
 from model.agent import AgentRepository
 
@@ -29,7 +29,7 @@ class Application(QApplication):
             folder = self.config.get("current_folder")
         else:
             self.config.set("current_folder", folder)
-        self.window.setCentralWidget(PlanSelectionScreen(self.config, self.agent_repo, self.show_debugging))
+        self.window.setCentralWidget(GoalSelectionScreen(self.config, self.agent_repo, self.show_debugging))
 
     def show_debugging(self, selected_im: int, selected_agent: str):
         self.window.setCentralWidget(DebuggingScreen(self, selected_im, selected_agent))

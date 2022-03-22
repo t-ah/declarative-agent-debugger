@@ -11,10 +11,10 @@ from gui.util import setup_table, clear_model
 from model.agent import AgentRepository, AgentData
 
 
-class PlanSelectionScreen(QWidget):
+class GoalSelectionScreen(QWidget):
 
     def __init__(self, config: Config, agent_repo: AgentRepository, callback_goal_selected: Callable[[int, str], None]):
-        super(PlanSelectionScreen, self).__init__()
+        super(GoalSelectionScreen, self).__init__()
 
         self.config = config
         self.agent_repo = agent_repo
