@@ -2,7 +2,7 @@ import sys
 import json
 from functools import cache
 
-from model.bdi import BeliefChange, Plan, Intention, BDIEvent, IntendedMeans
+from model.bdi import BeliefChange, Plan, Intention, BDIEvent, IntendedMeans, Instruction
 
 
 class AgentData:
@@ -86,13 +86,13 @@ class AgentRepository:
                 cycle = json.loads(line)
                 temp_ims = []
                 if "I+" in cycle:
-                    intention = Intention(cycle["I+"], cycle["nr"], sys.maxsize, [], [], [])
+                    intention = Intention(cycle["I+"], cycle["nr"], sys.maxsize, [], [])
                     data.intentions[cycle["I+"]] = intention
                 if "IM+" in cycle:
                     for im_data in cycle["IM+"]:
                         intention = data.intentions[im_data["i"]]
                         im = IntendedMeans(im_data["id"], intention, cycle["nr"], sys.maxsize, "?", im_data["file"],
-                                           im_data["line"], data.plans[im_data["plan"]], im_data["trigger"],
+                                           im_data["line"], [], data.plans[im_data["plan"]], im_data["trigger"],
                                            im_data["ctx"], [], None, None)
                         intention.means.append(im)
                         temp_ims.append(im)
@@ -114,10 +114,10 @@ class AgentRepository:
                             event.parent.intention.events.append(event)
                         else:
                             pass  # TODO see other TODO below
-                if "SI" in cycle:
-                    intention = data.intentions[cycle["SI"]]
-                    if "I" in cycle:
-                        intention.instructions.append(cycle["I"]["instr"])
+                if "I" in cycle:
+                    instr_data = cycle["I"]
+                    im = data.intended_means[instr_data["im"]]
+                    im.instructions.append(Instruction(instr_data["file"], instr_data["line"], instr_data["instr"]))
                 if "IM-" in cycle:
                     for im_data in cycle["IM-"]:
                         im = data.intended_means[im_data["id"]]

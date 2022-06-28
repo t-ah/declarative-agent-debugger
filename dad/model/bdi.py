@@ -19,6 +19,7 @@ class IntendedMeans:
     res: str
     file: str
     line: int
+    instructions: list["Instruction"]
     plan: "Plan"
     trigger: str
     context: str
@@ -36,7 +37,6 @@ class Intention:
     start: int
     end: int
     means: list[IntendedMeans]
-    instructions: list[str]
     events: list[BDIEvent]
 
 
@@ -60,3 +60,10 @@ class Plan:
     def readable(self) -> str:
         f_body = ";\n".join(["\t" + x for x in self.body.split("; ")])
         return f"{self.trigger} : {self.context} <-\n{f_body}."
+
+
+@dataclass
+class Instruction:
+    file: str
+    line: int
+    text: str
