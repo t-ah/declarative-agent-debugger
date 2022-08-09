@@ -2,7 +2,7 @@ import sys
 import json
 from functools import cache
 
-from model.bdi import BeliefChange, Plan, Intention, BDIEvent, IntendedMeans, Instruction
+from model.bdi import BeliefChange, Plan, Intention, BDIEvent, IntendedMeans, Instruction, EventType, FailureReason
 
 
 class AgentData:
@@ -84,71 +84,84 @@ class AgentRepository:
 
             for line in log_file.readlines():
                 cycle = json.loads(line)
-                temp_ims = []
+                ims_added_this_cycle = []
                 if "I+" in cycle:
                     intention = Intention(cycle["I+"], cycle["nr"], sys.maxsize, [], [])
                     data.intentions[cycle["I+"]] = intention
                 if "IM+" in cycle:
                     for im_data in cycle["IM+"]:
                         intention = data.intentions[im_data["i"]]
-                        im = IntendedMeans(im_data["id"], intention, cycle["nr"], sys.maxsize, "?", im_data["file"],
-                                           im_data["line"], [], data.plans[im_data["plan"]], im_data["trigger"],
-                                           im_data["ctx"], [], None, None)
+                        im = IntendedMeans(im_data["id"], intention, cycle["nr"], sys.maxsize, "?", None,
+                                           im_data["file"], im_data["line"], [], data.plans[im_data["plan"]],
+                                           im_data["trigger"], im_data.get("ctx", "T"), [], None, None)
                         intention.means.append(im)
-                        temp_ims.append(im)
+                        ims_added_this_cycle.append(im)
                         im.plan.used += 1
                         data.intended_means[im_data["id"]] = im
 
-                        if "parent" in im_data:
-                            parent_im_id = int(im_data["parent"])
-                            parent_im = data.intended_means[parent_im_id]
-                            im.parent = parent_im
-                            parent_im.children.append(im)
                 if "E+" in cycle:
                     for event_data in cycle["E+"]:
-                        ev_id, trigger = event_data.split(": ")
-                        event = BDIEvent(None, cycle["nr"], trigger, -1)
-                        if ev_id != "B":  # max. 1 event of this type
-                            parent_im_id = int(ev_id)
+                        ev_id = event_data["id"]
+                        trigger = event_data["t"]
+                        event = BDIEvent(ev_id, None, trigger, EventType.BELIEF_UPDATE, cycle["nr"], -1)
+                        if event_data["src"] == "B":  # event is belief update
+                            pass
+                        else:
+                            if "nf" in event_data:  # new focus (!!...)
+                                event.type = EventType.GOAL_NEW_FOCUS
+                            else:
+                                event.type = EventType.SUB_GOAL
+                            if "I" in cycle:
+                                parent_im_id = int(cycle["I"]["im"])
+                            else:  # parent is SE because no applicable plan
+                                parent_event_id = cycle["SE"]
+                                parent_event = data.events[parent_event_id]
+                                parent_im_id = parent_event.parent.id
                             event.parent = data.intended_means[parent_im_id]
                             event.parent.intention.events.append(event)
-                        else:
-                            pass  # TODO see other TODO below
+                        data.events[ev_id] = event
                 if "I" in cycle:
                     instr_data = cycle["I"]
                     im = data.intended_means[instr_data["im"]]
-                    im.instructions.append(Instruction(instr_data["file"], instr_data["line"], instr_data["instr"]))
+                    instruction = Instruction(instr_data["file"], instr_data["line"], instr_data["instr"])
+                    im.instructions.append(instruction)
+                    if "U" in cycle:
+                        instruction.unifier = cycle["U"]
                 if "IM-" in cycle:
                     for im_data in cycle["IM-"]:
-                        im = data.intended_means[im_data["id"]]
-                        im.end = cycle["nr"]
-                        im.res = im_data.get("res", "?")
+                        im_id = im_data["id"]
+                        if im_id == -1:  # IM did not really exist -> no applicable/relevant plan
+                            pass  # TODO selected event SE could not be handled
+                        else:
+                            im = data.intended_means[im_data["id"]]
+                            im.end = cycle["nr"]
+                            im.res = im_data["res"]
+                            if "reason" in im_data:
+                                reason = im_data["reason"]
+                                im.failure_reason = FailureReason.from_jason_dict(reason)
+
                 if "I-" in cycle:
-                    data.intentions[cycle["I-"]].end = cycle["nr"]
+                    for intention_id in cycle["I-"]:
+                        data.intentions[intention_id].end = cycle["nr"]
                 if "SE" in cycle:  # E+ and IM+ need to be processed before SE
-                    event_data = cycle["SE"]
-                    ev_id, trigger = event_data.split(": ")
-                    if ev_id != "B":
-                        intention_id = int(ev_id)
-                        intention = data.intentions[intention_id]
-                        event = intention.events[-1]
-                        event.selected = cycle["nr"]
-                    else:
-                        event = BDIEvent(None, cycle["nr"], trigger, cycle["nr"])
-                        intention_id = cycle["I+"]  # SE with B-id means a new intention is created
-                        intention = data.intentions[intention_id]
-                        intention.events.append(event)
-                        # TODO when was the event actually posted?
-                    for im in temp_ims:
+                    ev_id = cycle["SE"]
+                    event = data.events[ev_id]
+                    event.cycle_selected = cycle["nr"]
+                    if not event.type == EventType.SUB_GOAL:  # i.e. new intention if applicable plan for event
+                        if "I+" in cycle:
+                            intention_id = cycle["I+"]
+                            intention = data.intentions[intention_id]
+                            intention.events.append(event)
+                    for im in ims_added_this_cycle:
                         im.event = event
-                    #     if event.parent:
-                    #         im.parent = event.parent
-                    #         event.parent.children.append(im)
-                    #         # print(f"{im.plan.trigger} --> {im.parent.plan.trigger}")
+                        if event.parent:
+                            im.parent = event.parent
+                            event.parent.children.append(im)
                 if "B+" in cycle:
                     for belief in cycle["B+"]:
                         data.beliefs.append(BeliefChange(cycle["nr"], True, belief))
                 if "B-" in cycle:
                     for belief in cycle["B-"]:
                         data.beliefs.append(BeliefChange(cycle["nr"], False, belief))
+                # TODO parse and put unifier somewhere
         return data

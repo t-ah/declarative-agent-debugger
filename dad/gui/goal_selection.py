@@ -112,10 +112,10 @@ class GoalSelectionScreen(QWidget):
                 continue
             im = intention.means[0]
             self.intention_model.appendRow(
-                QStandardItem(x) for x in [str(im.id), im.trigger, im.context, str(im.event.cycle), str(im.start)])
+                QStandardItem(x) for x in [str(im.id), im.trigger, im.context, im.get_event_added(), str(im.start)])
         for _, im in agent_data.intended_means.items():
             self.goal_model.appendRow(
-                QStandardItem(x) for x in [str(im.id), im.trigger, im.context, str(im.event.cycle), str(im.start)])
+                QStandardItem(x) for x in [str(im.id), im.trigger, im.context, im.get_event_added(), str(im.start)])
         for label, plan in agent_data.plans.items():
             if plan.used == 0:
                 continue
@@ -148,7 +148,7 @@ class GoalSelectionDialog(QDialog):
         for im in agent_data.intended_means.values():
             if im.plan.label == plan_label:
                 model.appendRow(
-                    QStandardItem(x) for x in [str(im.id), im.trigger, im.context, str(im.event.cycle), str(im.start)])
+                    QStandardItem(x) for x in [str(im.id), im.trigger, im.context, str(im.event.cycle_added), str(im.start)])
 
     def on_goal_selected(self):
         self.selected_goal = int(self.table.currentIndex().siblingAtColumn(0).data())

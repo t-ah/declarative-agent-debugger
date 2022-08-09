@@ -68,6 +68,7 @@ class DebuggingScreen(QWidget):
             if buggy_node:
                 im = buggy_node.im
                 self.bug = Bug(im.event.name if im.event else "", im.file, str(im.line), code=im.plan.readable())
+                self.tree_view.expand_node_with_plan_instructions(buggy_node)
             else:
                 self.bug = Bug("No bug found", "-", "-")
             self.bug_located()
@@ -96,7 +97,7 @@ class DebuggingScreen(QWidget):
         btn_bar.btn_no.clicked.connect(self.bug_located)
         validation_widget.layout().addRow(btn_bar)
 
-        cycle = im.event.cycle if im.event else im.start
+        cycle = im.event.cycle_added if im.event else im.start
 
         validation_widget.layout().addRow(
             QLabel(f"State when goal added (cycle {str(cycle)}):"))
@@ -193,7 +194,11 @@ class DebuggingTreeView(QTreeWidget):
     def color_node(self, node: JasonDebuggingTreeNode, color: QColor):
         view = self.views[node]
         if view:
-            view.setBackground(0, color)
+            DebuggingTreeView.color_node_view(view, color)
+
+    @staticmethod
+    def color_node_view(view: QTreeWidgetItem, color: QColor):
+        view.setBackground(0, color)
 
     def highlight_node(self, node: JasonDebuggingTreeNode):
         if self.highlighted_node:
@@ -203,6 +208,17 @@ class DebuggingTreeView(QTreeWidget):
 
     def mark_validity(self, node: JasonDebuggingTreeNode, valid: bool):
         self.color_node(node, self.color_valid if valid else self.color_invalid)
+
+    def expand_node_with_plan_instructions(self, origin_node: JasonDebuggingTreeNode):
+        parent_view = self.views[origin_node]
+        parent_view.takeChildren()
+        instructions = origin_node.im.instructions
+        for instruction in instructions:
+            node_view = DebuggingTreeView.create_node(str(instruction))
+            if instruction.text.startswith("!"):
+                self.color_node_view(node_view, self.color_valid)
+            parent_view.addChild(node_view)
+        self.expandAll()
 
 
 class AgentStateView(QWidget):
