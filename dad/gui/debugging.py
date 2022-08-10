@@ -1,11 +1,11 @@
-from typing import Optional
+from typing import Optional, Callable
 
 from PyQt6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidgetItem, \
-    QTreeWidget, QAbstractItemView, QFormLayout, QSplitter
+    QTreeWidget, QAbstractItemView, QFormLayout, QSplitter, QComboBox
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 
-from model.bdi import Intention
+from model.bdi import Intention, Instruction, IntendedMeans, InstructionType
 from model.agent import AgentData, AgentRepository
 from debug.navigation_strategy import JasonDebuggingTreeNode, SimpleJasonNavigationStrategy, Result
 
@@ -14,12 +14,13 @@ class DebuggingScreen(QWidget):
     def __init__(self, app, selected_goal: int, selected_agent: str):
         super(DebuggingScreen, self).__init__()
         self.app = app
-        self.agent_repo = self.app.agent_repo
-        self.selected_agent = selected_agent
+        self.agent_repo: AgentRepository = self.app.agent_repo
+        self.selected_agent: str = selected_agent
         self.agent_data: AgentData = self.agent_repo.get_agent_data(selected_agent)
         self.node: Optional[JasonDebuggingTreeNode] = None
         self.question_view: Optional[QWidget] = None
         self.bug: Optional[Bug] = None
+        self.instruction_views: dict[Instruction, QTreeWidgetItem] = {}
 
         QHBoxLayout(self)
         self.splitter = QSplitter()
@@ -48,14 +49,18 @@ class DebuggingScreen(QWidget):
     def create_tree(agent_data: AgentData, selected_im: int) -> JasonDebuggingTreeNode:
         return JasonDebuggingTreeNode(agent_data, agent_data.intended_means.get(selected_im))
 
-    def bug_located(self):
-        result_view = ResultView()
+    def buggy_goal_located(self):
+        result_view = FormWidget()
         self.set_question_view(result_view)
         if self.bug:
-            result_view.add_message(
-                f"Bug located in {self.bug.file} line {self.bug.location}. Reason: {self.bug.reason}")
-            result_view.add_message(f"Code:\n{self.bug.code}")
-            result_view.finalize()
+            result_view.add_row(
+                f"Bug located in\n{self.bug.file}\nline {self.bug.location}.\nReason: {self.bug.reason}")
+            result_view.add_row(f"Code:\n{self.bug.code}")
+            cont_button = QPushButton("Debug goal/plan")
+            result_view.add_button(cont_button)
+            cont_button.clicked.connect(lambda: self.debug_plan(self.strategy.final_bug.im, 0))
+        else:
+            result_view.add_row("Sorry, no bug could be located.")
 
     def debug(self):
         next_node = self.strategy.get_next()
@@ -68,17 +73,53 @@ class DebuggingScreen(QWidget):
             if buggy_node:
                 im = buggy_node.im
                 self.bug = Bug(im.event.name if im.event else "", im.file, str(im.line), code=im.plan.readable())
-                self.tree_view.expand_node_with_plan_instructions(buggy_node)
+                self.instruction_views = self.tree_view.expand_node_with_plan_instructions(buggy_node)
             else:
-                self.bug = Bug("No bug found", "-", "-")
-            self.bug_located()
+                self.bug = None
+            self.buggy_goal_located()
+
+    def debug_plan(self, im: IntendedMeans, instruction_index: int):
+        if instruction_index >= len(im.instructions):
+            self.buggy_goal_but_no_instruction_found(im)
+            return
+        instruction = im.instructions[instruction_index]
+        if instruction.text.startswith("!"):
+            self.tree_view.mark_view(self.instruction_views[instruction], True)
+            self.debug_plan(im, instruction_index + 1)
+        else:
+            instruction_type = instruction.get_type()
+            self.tree_view.highlight_view(self.instruction_views[instruction])
+            instruction_widget = FormWidget()
+            self.set_question_view(instruction_widget)
+            instruction_widget.add_row("Question", "Did the instruction produce the expected results?")
+            instruction_widget.add_row("Instruction", str(instruction))
+            instruction_widget.add_row("Type", str(instruction_type.value))
+            # TODO: show result information depending on instruction type
+            if instruction_type == InstructionType.MENTAL_NOTE:
+                cycle = instruction.cycle
+                diff = self.agent_repo.get_cycle_diff(self.selected_agent, cycle)
+                instruction_widget.add_row("Beliefs added:")
+                instruction_widget.layout().addRow(BeliefView(diff.beliefs_added))
+                instruction_widget.add_row("Beliefs deleted:")
+                instruction_widget.layout().addRow(BeliefView(diff.beliefs_deleted))
+            elif instruction_type == InstructionType.ACTION:
+                # TODO
+                pass  # ???
+            elif instruction_type == InstructionType.INTERNAL_ACTION:
+                pass
+            elif instruction_type == InstructionType.TEST_GOAL:
+                pass
+            elif instruction_type == InstructionType.EXPRESSION:
+                pass
+            else:
+                instruction_widget.add_row(f"Instruction type {instruction_type.value} not supported")
+            instruction_widget.add_yes_no_buttons(lambda: self.debug_plan(im, instruction_index + 1),
+                                                  lambda: self.buggy_instruction_found(im, instruction_index))
 
     def validate_goal_addition(self, node: JasonDebuggingTreeNode):
         im = node.im
-        validation_widget = QWidget()
+        validation_widget = FormWidget()
         self.set_question_view(validation_widget)
-        validation_widget.setLayout(QFormLayout())
-        validation_widget.setStyleSheet("QLabel {font: 16pt}")
 
         cause = f"Parent goal: {im.parent.trigger}" if im.parent else "Percept"
         if im.trigger[0] == "+":
@@ -86,23 +127,17 @@ class DebuggingScreen(QWidget):
             self.bug = Bug(f"Bug in adding goal {im.trigger}.", "", "")
         else:
             question = "Is it 'acceptable' that the plan failed at this point?"
-            self.bug = Bug(f"Plan for {im.trigger} should not have failed.", "", "")  # TODO show causing instr
+            self.bug = Bug(f"Plan for {im.trigger} should not have failed.", "", "")
 
-        validation_widget.layout().addRow("Question", QLabel(question))
-        validation_widget.layout().addRow("Goal (Trigger)", QLabel(im.trigger))
-        validation_widget.layout().addRow("Cause", QLabel(cause))
-
-        btn_bar = YesNoButtonBar()
-        btn_bar.btn_yes.clicked.connect(lambda: self.goal_addition_validated(node))
-        btn_bar.btn_no.clicked.connect(self.bug_located)
-        validation_widget.layout().addRow(btn_bar)
+        validation_widget.add_row("Question", question)
+        validation_widget.add_row("Goal (Trigger)", im.trigger)
+        validation_widget.add_row("Origin", cause)
+        validation_widget.add_yes_no_buttons(lambda: self.goal_addition_validated(node), self.buggy_goal_located)
 
         cycle = im.event.cycle_added if im.event else im.start
+        validation_widget.add_row("Agent state")
 
-        validation_widget.layout().addRow(
-            QLabel(f"State when goal added (cycle {str(cycle)}):"))
-
-        state_view = AgentStateView(self.agent_repo, self.selected_agent, cycle)
+        state_view = AgentStateView(self.agent_repo, self.selected_agent, cycle, "Goal added")
         validation_widget.layout().addRow(state_view)
 
         self.set_question_view(validation_widget)
@@ -112,22 +147,26 @@ class DebuggingScreen(QWidget):
 
     def validate_goal_result(self, node: JasonDebuggingTreeNode):
         im = node.im
-        validation_widget = QWidget()
-        validation_widget.setLayout(QFormLayout())
-        validation_widget.setStyleSheet("QLabel {font: 16pt}")
+        validation_widget = FormWidget()
 
-        validation_widget.layout().addRow("Question", QLabel("Has the goal been achieved?"))
-        validation_widget.layout().addRow("Goal (Trigger)", QLabel(im.trigger))
-        validation_widget.layout().addRow("", QLabel(""))
+        validation_widget.add_row("Goal", im.trigger)
 
-        btn_bar = YesNoButtonBar()
-        btn_bar.btn_yes.clicked.connect(self.goal_result_validated)
-        btn_bar.btn_no.clicked.connect(self.goal_result_invalidated)
-        validation_widget.layout().addRow(btn_bar)
+        if im.res == "np":
+            validation_widget.add_row("Question", "Is an applicable plan missing?")
+        elif im.res == "failed":
+            reason = im.failure_reason
+            validation_widget.add_row("Failure:", reason.type)
+            validation_widget.add_row("Failure message:", reason.msg)
+            validation_widget.add_row("Failure location:", f"{reason.src}:{reason.line}")
+            validation_widget.add_row("", "")
+            validation_widget.add_row("Question", "Is this goal failure acceptable?")
+        else:  # im.res == "achieved", belief trigger, etc.
+            validation_widget.add_row("Question", "Has the goal been achieved?")
+        validation_widget.add_row("", "")
+        validation_widget.add_yes_no_buttons(self.goal_result_validated, self.goal_result_invalidated)
+        validation_widget.layout().addRow(QLabel(f"State"))
 
-        validation_widget.layout().addRow(QLabel(f"State after goal (cycle {im.end}):"))
-
-        state_view = AgentStateView(self.agent_repo, self.selected_agent, im.end)
+        state_view = AgentStateView(self.agent_repo, self.selected_agent, im.end, "Goal finished")
         validation_widget.layout().addRow(state_view)
 
         self.set_question_view(validation_widget)
@@ -142,6 +181,29 @@ class DebuggingScreen(QWidget):
         self.tree_view.mark_validity(self.node, False)
         self.debug()
 
+    def buggy_instruction_found(self, im: IntendedMeans, instruction_index: int):
+        buggy_instruction = im.instructions[instruction_index]
+        result_view = FormWidget()
+        result_view.add_row("Buggy instruction located:")
+        result_view.add_row("Instruction:", str(buggy_instruction))
+        result_view.add_row("File:", buggy_instruction.file)
+        result_view.add_row("Line:", str(buggy_instruction.line))
+        result_view.add_row("In goal:", im.get_event_name())
+        self.set_question_view(result_view)
+
+    def buggy_goal_but_no_instruction_found(self, im: IntendedMeans):
+        result_view = FormWidget()
+        result_view.add_row("Buggy goal located:")
+        result_view.add_row(im.get_event_name())
+        result_view.add_row("File:", im.file)
+        result_view.add_row("Line:", str(im.line))
+        result_view.add_row("No buggy instruction could be determined:")
+        result_view.add_row("1. Consider if any instruction is missing.")
+        result_view.add_row("2. Consider if any instruction is counterproductive.")
+        result_view.add_row("3. Consider order of instructions.")
+        result_view.add_row("4. Consider external influences.")
+        self.set_question_view(result_view)
+
     def set_question_view(self, view: QWidget):
         if self.question_view:
             self.question_view_container.layout().removeWidget(self.question_view)
@@ -150,6 +212,25 @@ class DebuggingScreen(QWidget):
 
     def back(self):
         self.app.show_plan_selection()
+
+
+class FormWidget(QWidget):
+    def __init__(self):
+        super(FormWidget, self).__init__()
+        self.setLayout(QFormLayout())
+        self.setStyleSheet("QLabel {font: 16pt}")
+
+    def add_row(self, text: str, label: str = ""):
+        self.layout().addRow(text, QLabel(label))
+
+    def add_yes_no_buttons(self, yes_callback: Callable, no_callback: Callable):
+        btn_bar = YesNoButtonBar()
+        btn_bar.btn_yes.clicked.connect(yes_callback)
+        btn_bar.btn_no.clicked.connect(no_callback)
+        self.layout().addRow(btn_bar)
+
+    def add_button(self, button: QPushButton):
+        self.layout().addRow(button)
 
 
 class YesNoButtonBar(QWidget):
@@ -164,16 +245,18 @@ class YesNoButtonBar(QWidget):
 
 
 class DebuggingTreeView(QTreeWidget):
+
+    color_std = QColor(0, 0, 0)
+    color_highlight = QColor(0, 10, 100)
+    color_valid = QColor(0, 150, 0)
+    color_invalid = QColor(150, 0, 0)
+
     def __init__(self, tree: JasonDebuggingTreeNode):
         super(DebuggingTreeView, self).__init__()
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.views = {}
-        self.highlighted_node: Optional[JasonDebuggingTreeNode] = None
-        self.color_std = QColor(0, 0, 0)
-        self.color_highlight = QColor(0, 10, 100)
-        self.color_valid = QColor(0, 150, 0)
-        self.color_invalid = QColor(150, 0, 0)
+        self.highlighted_view: Optional[QTreeWidgetItem] = None
         self.setHeaderLabels(["Debugging Tree"])
 
         for node in tree.traverse():
@@ -200,29 +283,39 @@ class DebuggingTreeView(QTreeWidget):
     def color_node_view(view: QTreeWidgetItem, color: QColor):
         view.setBackground(0, color)
 
+    @staticmethod
+    def highlight_view(view: QTreeWidgetItem):
+        view.setBackground(0, DebuggingTreeView.color_highlight)
+
     def highlight_node(self, node: JasonDebuggingTreeNode):
-        if self.highlighted_node:
-            self.color_node(node, self.color_std)
-        self.highlighted_node = node
-        self.color_node(node, self.color_highlight)
+        # if self.highlighted_view:
+        #     self.color_node_view(self.highlighted_view, self.color_std)
+        # self.highlighted_node = node
+        self.color_node(node, DebuggingTreeView.color_highlight)
 
     def mark_validity(self, node: JasonDebuggingTreeNode, valid: bool):
-        self.color_node(node, self.color_valid if valid else self.color_invalid)
+        self.color_node(node, DebuggingTreeView.color_valid if valid else self.color_invalid)
 
-    def expand_node_with_plan_instructions(self, origin_node: JasonDebuggingTreeNode):
-        parent_view = self.views[origin_node]
+    def mark_view(self, view: QTreeWidgetItem, valid: bool):
+        self.color_node_view(view, DebuggingTreeView.color_valid if valid else self.color_invalid)
+
+    def expand_node_with_plan_instructions(self, origin: JasonDebuggingTreeNode) -> dict[Instruction, QTreeWidgetItem]:
+        parent_view = self.views[origin]
         parent_view.takeChildren()
-        instructions = origin_node.im.instructions
+        instructions = origin.im.instructions
+        result: dict[Instruction, QTreeWidgetItem] = {}
         for instruction in instructions:
             node_view = DebuggingTreeView.create_node(str(instruction))
+            result[instruction] = node_view
             if instruction.text.startswith("!"):
-                self.color_node_view(node_view, self.color_valid)
+                self.color_node_view(node_view, DebuggingTreeView.color_valid)
             parent_view.addChild(node_view)
         self.expandAll()
+        return result
 
 
 class AgentStateView(QWidget):
-    def __init__(self, agent_repo: AgentRepository, agent_name: str, start_cycle=0, navigable=True):
+    def __init__(self, agent_repo: AgentRepository, agent_name: str, start_cycle=0, start_label="Start", navigable=True):
         super(AgentStateView, self).__init__()
         self.agent_repo = agent_repo
         self.agent_name = agent_name
@@ -234,24 +327,43 @@ class AgentStateView(QWidget):
         self.setLayout(QVBoxLayout())
 
         self.belief_view = BeliefView()
-        self.layout().addWidget(self.belief_view)
         self.intention_view = IntentionView(self.agent_data)
+        self.layout().addWidget(self.belief_view)
         self.layout().addWidget(self.intention_view)
 
+        self.cycle_label = QLabel(str(start_cycle))
+        self.bookmark_combo = QComboBox()
+        self.bookmark_combo.setEditable(False)
+        self.add_bookmark(start_cycle, start_label)
         btn_prev = QPushButton("Prev")
         btn_next = QPushButton("Next")
-        self.cycle_label = QLabel(str(start_cycle))  # TODO jump to cycle
+        btn_go = QPushButton("Go")
         cycle_bar = QWidget()
         QHBoxLayout(cycle_bar)
         cycle_bar.layout().addWidget(btn_prev)
         cycle_bar.layout().addWidget(self.cycle_label)
         cycle_bar.layout().addWidget(btn_next)
+        bookmarks_widget = QWidget()
+        QVBoxLayout(bookmarks_widget)
+        bookmarks_widget.layout().addWidget(QLabel("Bookmarks"))
+        bookmarks_widget.layout().addWidget(self.bookmark_combo)
+        cycle_bar.layout().addWidget(bookmarks_widget)
+        cycle_bar.layout().addWidget(btn_go)
         cycle_bar.layout().addStretch()
         btn_prev.clicked.connect(self.prev_cycle)
         btn_next.clicked.connect(self.next_cycle)
-        self.layout().addWidget(cycle_bar)  # TODO reset button for jumping back to original cycle
-
+        btn_go.clicked.connect(self.goto_selected_bookmark)
+        self.layout().addWidget(cycle_bar)
         self.show_cycle(self.start_cycle)
+
+    def goto_selected_bookmark(self):
+        if not self.bookmark_combo.currentText():
+            return
+        cycle = int(self.bookmark_combo.currentText().split(": ")[0])
+        self.show_cycle(cycle)
+
+    def add_bookmark(self, cycle: int, description: str):
+        self.bookmark_combo.insertItem(100, f"{cycle}: {description}")
 
     def show_cycle(self, cycle):
         self.current_cycle = cycle
@@ -278,15 +390,17 @@ class TreeView(QWidget):
 
 
 class BeliefView(TreeView):
-    def __init__(self):
+    def __init__(self, beliefs: Optional[list[str]] = None):
         super(BeliefView, self).__init__("Beliefs")
         self.tree.setColumnWidth(0, 1000)
         self.tree.setHeaderLabels(["Belief"])
+        self.set_beliefs(beliefs)
 
     def set_beliefs(self, beliefs: list[str]):
-        self.tree.clear()
-        for belief in beliefs:
-            self.tree.addTopLevelItem(QTreeWidgetItem([belief]))
+        if beliefs:
+            self.tree.clear()
+            for belief in beliefs:
+                self.tree.addTopLevelItem(QTreeWidgetItem([belief]))
 
 
 class IntentionView(TreeView):
@@ -317,18 +431,6 @@ class IntentionView(TreeView):
         parent_node.addChild(node)
         for child_im in im.children:
             self.add_im_recursive(child_im, node)
-
-
-class ResultView(QWidget):
-    def __init__(self):
-        super(ResultView, self).__init__()
-        self.setLayout(QVBoxLayout())
-
-    def add_message(self, msg):
-        self.layout().addWidget(QLabel(msg))
-
-    def finalize(self):
-        self.layout().addStretch()
 
 
 class Bug:

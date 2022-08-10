@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import sys
 import json
 from functools import cache
@@ -12,6 +14,14 @@ class AgentData:
         self.plans: dict[str, Plan] = {}
         self.events: dict[int, BDIEvent] = {}
         self.beliefs: list[BeliefChange] = []
+
+
+@dataclass
+class AgentStateDiff:
+    beliefs_added: list[str]
+    beliefs_deleted: list[str]
+    goals_added: list[IntendedMeans]
+    goals_achieved: list[IntendedMeans]
 
 
 class AgentRepository:
@@ -48,7 +58,7 @@ class AgentRepository:
         }
         return state
 
-    def get_agent_state_diff(self, agent_name, cycle1, cycle2):
+    def get_diff(self, agent_name: str, cycle1: int, cycle2: int) -> AgentStateDiff:
         agent_data = self.get_agent_data(agent_name)
         state1 = self.get_agent_state(agent_name, cycle1)
         state2 = self.get_agent_state(agent_name, cycle2)
@@ -63,13 +73,10 @@ class AgentRepository:
             if im.end <= cycle2:
                 goals_finished.append(im)
 
-        diff = {
-            "B+": list(beliefs_added),
-            "B-": list(beliefs_removed),
-            "G+": goals_started,
-            "G-": goals_finished
-        }
-        return diff
+        return AgentStateDiff(list(beliefs_added), list(beliefs_removed), goals_started, goals_finished)
+
+    def get_cycle_diff(self, agent: str, cycle: int):
+        return self.get_diff(agent, cycle - 1, cycle)
 
     @cache
     def get_agent_data(self, agent_name: str) -> AgentData:
@@ -123,7 +130,7 @@ class AgentRepository:
                 if "I" in cycle:
                     instr_data = cycle["I"]
                     im = data.intended_means[instr_data["im"]]
-                    instruction = Instruction(instr_data["file"], instr_data["line"], instr_data["instr"])
+                    instruction = Instruction(instr_data["file"], instr_data["line"], instr_data["instr"], cycle["nr"])
                     im.instructions.append(instruction)
                     if "U" in cycle:
                         instruction.unifier = cycle["U"]
