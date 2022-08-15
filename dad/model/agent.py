@@ -17,6 +17,13 @@ class AgentData:
 
 
 @dataclass
+class AgentState:  # TODO: use in function
+    cycle: int
+    beliefs: list[str]
+    goals: list[IntendedMeans]
+
+
+@dataclass
 class AgentStateDiff:
     beliefs_added: list[str]
     beliefs_deleted: list[str]
@@ -28,7 +35,7 @@ class AgentRepository:
     def __init__(self, config):
         self.config = config
 
-    # TODO improve with caching
+    # TODO later: improve with caching
     def get_agent_state(self, agent_name, cycle) -> dict:
         agent_data = self.get_agent_data(agent_name)
 
@@ -51,7 +58,7 @@ class AgentRepository:
             if intention.start <= cycle <= intention.end:
                 intentions_active.append(intention)
 
-        state = {
+        state = {  # TODO use agentState object
             "beliefs": list(beliefs),
             "imeans": imeans_active,
             "intentions": intentions_active
@@ -79,10 +86,11 @@ class AgentRepository:
         return self.get_diff(agent, cycle - 1, cycle)
 
     @cache
-    def get_agent_data(self, agent_name: str) -> AgentData:
+    def get_agent_data(self, agent_name: str) -> AgentData:  # TODO: lists of SI, SE, to display in agent state view
         data = AgentData()
         log_path = self.config.get("current_folder") + "/" + agent_name + ".log"
 
+        active_actions = {}  # imID to Instruction
         with open(log_path, "r") as log_file:
             info = json.loads(log_file.readline())
             details = info["details"]
@@ -127,13 +135,23 @@ class AgentRepository:
                             event.parent = data.intended_means[parent_im_id]
                             event.parent.intention.events.append(event)
                         data.events[ev_id] = event
+                if "A-" in cycle:  # needs to be handled before A+
+                    for action_intention_id in cycle["A-"]:
+                        instruction = active_actions[action_intention_id]
+                        del active_actions[action_intention_id]
+                        instruction.end = cycle["nr"]
                 if "I" in cycle:
                     instr_data = cycle["I"]
                     im = data.intended_means[instr_data["im"]]
-                    instruction = Instruction(instr_data["file"], instr_data["line"], instr_data["instr"], cycle["nr"])
+                    instruction = Instruction(instr_data["file"], instr_data["line"], instr_data["instr"], cycle["nr"],
+                                              instr_data["type"])
+                    if "res" in instr_data:
+                        instruction.result = instr_data["res"]
                     im.instructions.append(instruction)
                     if "U" in cycle:
                         instruction.unifier = cycle["U"]
+                    if "A+" in cycle:
+                        active_actions[im.intention.id] = instruction
                 if "IM-" in cycle:
                     for im_data in cycle["IM-"]:
                         im_id = im_data["id"]
@@ -170,5 +188,4 @@ class AgentRepository:
                 if "B-" in cycle:
                     for belief in cycle["B-"]:
                         data.beliefs.append(BeliefChange(cycle["nr"], False, belief))
-                # TODO parse and put unifier somewhere
         return data

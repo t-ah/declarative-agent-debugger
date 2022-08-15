@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLab
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt
 
-from model.bdi import Intention, Instruction, IntendedMeans, InstructionType
+from model.bdi import Intention, Instruction, IntendedMeans
 from model.agent import AgentData, AgentRepository
 from debug.navigation_strategy import JasonDebuggingTreeNode, SimpleJasonNavigationStrategy, Result
 
@@ -87,32 +87,43 @@ class DebuggingScreen(QWidget):
             self.tree_view.mark_view(self.instruction_views[instruction], True)
             self.debug_plan(im, instruction_index + 1)
         else:
-            instruction_type = instruction.get_type()
             self.tree_view.highlight_view(self.instruction_views[instruction])
             instruction_widget = FormWidget()
             self.set_question_view(instruction_widget)
             instruction_widget.add_row("Question", "Did the instruction produce the expected results?")
             instruction_widget.add_row("Instruction", str(instruction))
-            instruction_widget.add_row("Type", str(instruction_type.value))
-            # TODO: show result information depending on instruction type
-            if instruction_type == InstructionType.MENTAL_NOTE:
-                cycle = instruction.cycle
-                diff = self.agent_repo.get_cycle_diff(self.selected_agent, cycle)
+            instruction_widget.add_row("Type", instruction.readable())
+            if "Bel" in instruction.type:
+                diff = self.agent_repo.get_cycle_diff(self.selected_agent, instruction.cycle)
                 instruction_widget.add_row("Beliefs added:")
                 instruction_widget.layout().addRow(BeliefView(diff.beliefs_added))
                 instruction_widget.add_row("Beliefs deleted:")
                 instruction_widget.layout().addRow(BeliefView(diff.beliefs_deleted))
-            elif instruction_type == InstructionType.ACTION:
-                # TODO
-                pass  # ???
-            elif instruction_type == InstructionType.INTERNAL_ACTION:
-                pass
-            elif instruction_type == InstructionType.TEST_GOAL:
-                pass
-            elif instruction_type == InstructionType.EXPRESSION:
-                pass
+            elif instruction.type == "action":
+                agent_view = AgentStateView(self.agent_repo, self.selected_agent, instruction.cycle, "Action started")
+                agent_view.add_bookmark(instruction.end, "Action finished executing")
+                instruction_widget.add_row("Agent state")
+                instruction_widget.layout().addRow(agent_view)
+            elif instruction.type == "internalAction":
+                if instruction_index > 0:
+                    instruction_widget.add_row("Unifier before", im.instructions[instruction_index - 1].unifier)
+                instruction_widget.add_row("Unifier after", instruction.unifier)
+                agent_view = AgentStateView(self.agent_repo, self.selected_agent, instruction.cycle, "Internal action")
+                instruction_widget.add_row("Agent state")
+                instruction_widget.layout().addRow(agent_view)
+            elif instruction.type == "test":
+                if instruction_index > 0:
+                    instruction_widget.add_row("Unifier before", im.instructions[instruction_index - 1].unifier)
+                instruction_widget.add_row("Unifier after", instruction.unifier)
+            elif instruction.type == "constraint":
+                if instruction.result == "":
+                    instruction.result = "Constraint satisfied"
+                instruction_widget.add_row("Result", instruction.result)
+                if instruction_index > 0:
+                    instruction_widget.add_row("Unifier before", im.instructions[instruction_index - 1].unifier)
+                instruction_widget.add_row("Unifier after", instruction.unifier)
             else:
-                instruction_widget.add_row(f"Instruction type {instruction_type.value} not supported")
+                instruction_widget.add_row(f"Instruction type {instruction.type} not supported")
             instruction_widget.add_yes_no_buttons(lambda: self.debug_plan(im, instruction_index + 1),
                                                   lambda: self.buggy_instruction_found(im, instruction_index))
 
@@ -137,6 +148,7 @@ class DebuggingScreen(QWidget):
         cycle = im.event.cycle_added if im.event else im.start
         validation_widget.add_row("Agent state")
 
+        # TODO: mark changes from the current cycle
         state_view = AgentStateView(self.agent_repo, self.selected_agent, cycle, "Goal added")
         validation_widget.layout().addRow(state_view)
 
@@ -198,10 +210,10 @@ class DebuggingScreen(QWidget):
         result_view.add_row("File:", im.file)
         result_view.add_row("Line:", str(im.line))
         result_view.add_row("No buggy instruction could be determined:")
-        result_view.add_row("1. Consider if any instruction is missing.")
-        result_view.add_row("2. Consider if any instruction is counterproductive.")
-        result_view.add_row("3. Consider order of instructions.")
-        result_view.add_row("4. Consider external influences.")
+        result_view.add_row("", "1. Consider if any instruction is missing.")
+        result_view.add_row("", "2. Consider if any instruction is counterproductive.")
+        result_view.add_row("", "3. Consider order of instructions.")
+        result_view.add_row("", "4. Consider external influences.")
         self.set_question_view(result_view)
 
     def set_question_view(self, view: QWidget):
@@ -288,9 +300,6 @@ class DebuggingTreeView(QTreeWidget):
         view.setBackground(0, DebuggingTreeView.color_highlight)
 
     def highlight_node(self, node: JasonDebuggingTreeNode):
-        # if self.highlighted_view:
-        #     self.color_node_view(self.highlighted_view, self.color_std)
-        # self.highlighted_node = node
         self.color_node(node, DebuggingTreeView.color_highlight)
 
     def mark_validity(self, node: JasonDebuggingTreeNode, valid: bool):

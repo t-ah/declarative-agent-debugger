@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, ClassVar
 from enum import Enum
 
 
@@ -90,25 +90,28 @@ class Plan:
         return f"{self.trigger} : {self.context} <-\n{f_body}."
 
 
-class InstructionType(Enum):
-    ACHIEVEMENT_GOAL = "Achievement goal"
-    ACHIEVEMENT_GOAL_NEW_FOCUS = "Achievement goal with new focus"
-    TEST_GOAL = "Test goal"
-    ACTION = "Action"
-    INTERNAL_ACTION = "Internal action"
-    EXPRESSION = "Expression"
-    MENTAL_NOTE = "Mental note"
-    UNKNOWN = "unknown"
-
-
 @dataclass
 class Instruction:
     file: str
     line: int
     text: str
     cycle: int
+    type: str
+    end: int = -1
+    result: str = ""
     unifier: str = "{}"
-    type: InstructionType = InstructionType.UNKNOWN
+    type_lookup: ClassVar[dict] = {
+        "none": "None",
+        "action": "Action",
+        "internalAction": "Internal Action",
+        "achieve": "Achievement Goal",
+        "test": "Test Goal",
+        "addBel": "Belief Addition",
+        "delBel": "Belief Deletion",
+        "delAddBel": "Belief Update",
+        "achieveNF": "Achievement Goal (new focus)",
+        "constraint": "Constraint"
+    }
 
     def __str__(self):
         return f"{self.text} : {self.unifier}"
@@ -116,25 +119,5 @@ class Instruction:
     def __hash__(self):
         return hash((self.file, self.line))
 
-    def get_type(self) -> InstructionType:
-        if self.type == InstructionType.UNKNOWN:
-            self.determine_type()
-        return self.type
-
-    def determine_type(self) -> None:
-        if not self.text:
-            return
-        if self.text.startswith("!!"):
-            self.type = InstructionType.ACHIEVEMENT_GOAL_NEW_FOCUS
-        elif self.text.startswith("!"):
-            self.type = InstructionType.ACHIEVEMENT_GOAL
-        elif self.text.startswith("?"):
-            self.type = InstructionType.TEST_GOAL
-        elif self.text.startswith("."):
-            self.type = InstructionType.INTERNAL_ACTION
-        elif self.text.startswith("+") or self.text.startswith("-"):
-            self.type = InstructionType.MENTAL_NOTE
-        elif self.text[0].islower():  # TODO: is that always true only for actions at this point?
-            self.type = InstructionType.ACTION
-        else:
-            self.type = InstructionType.EXPRESSION
+    def readable(self) -> str:
+        return Instruction.type_lookup.get(self.type, "Unknown")
