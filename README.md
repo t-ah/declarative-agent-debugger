@@ -6,6 +6,12 @@ Logs/traces can be generated e.g. with a [custom agent architecture for Jason](h
 
 ![Screenshot](/docs/screenshot.png)
 
+## Setup
+
+- `python -m venv venv` - create virtual env.
+- `source venv/bin/activate` - activate virtual env.
+- `pip install -r requirements.txt` - install dependencies (PyQt)
+
 ## Running
 
 `python3 dad/app.py`
